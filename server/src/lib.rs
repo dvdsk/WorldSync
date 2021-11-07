@@ -1,28 +1,30 @@
 use futures::future;
 use futures::StreamExt;
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Instant;
+use protocol::Error;
 
-use protocol::{tarpc, Credentials, World};
-use tarpc::context;
+use protocol::{tarpc, User, World};
 use tarpc::server::{incoming::Incoming, Channel};
 use tarpc::tokio_serde::formats::Json;
+use uuid::Uuid;
 
+pub mod admin_ui;
 pub mod db;
-use db::user::{User, UserDb};
+use db::user::UserDb;
+mod rpc;
+use rpc::ConnState;
 
 pub struct Session {
     user: User,
     last_hb: Instant,
 }
 
-use uuid::Uuid;
 #[derive(Clone)]
 pub struct Sessions(Arc<RwLock<HashMap<Uuid, Session>>>);
-
 impl Sessions {
     pub fn new() -> Self {
         Self(Arc::new(RwLock::new(HashMap::new())))
@@ -39,34 +41,10 @@ impl Sessions {
     }
 }
 
-#[derive(Clone)]
-pub struct ConnState {
-    pub peer_addr: SocketAddr,
-    pub sessions: Sessions,
-    pub userdb: UserDb,
-}
-
-pub fn version() -> &'static str{ 
+pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-#[tarpc::server]
-impl World for ConnState {
-    async fn version(self, _: context::Context) -> protocol::Version {
-        protocol::Version { 
-            protocol: protocol::version().to_owned(), 
-            server: self::version().to_owned(),
-        }
-    }
-    async fn log_in(mut self, _: context::Context, credentials: Credentials) -> Result<Uuid, ()> {
-        if let Ok(user) = self.userdb.validate_credentials(credentials).await {
-            let uuid = self.sessions.add(user);
-            Ok(uuid)
-        } else {
-            Err(())
-        }
-    }
-}
 
 pub async fn host(sessions: Sessions, userdb: UserDb, port: u16) {
     let server_addr = (IpAddr::V4(Ipv4Addr::LOCALHOST), port);

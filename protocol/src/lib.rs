@@ -2,6 +2,21 @@ pub use tarpc;
 use serde::{Serialize, Deserialize};
 pub use uuid::Uuid;
 
+#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize)]
+pub enum Error {
+    #[error("wrong username or password")]
+    IncorrectLogin,
+    #[error("internal server error, please ask admin for help")]
+    Internal,
+    #[error("user already exists")]
+    AlreadyExists,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub username: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Credentials {
     pub username: String,
@@ -24,7 +39,11 @@ pub fn version() -> &'static str{
 pub trait World {
     /// Returns a greeting for name.
     async fn version() -> Version;
-    async fn log_in(credentials: Credentials) -> Result<Uuid,()>;
+    async fn log_in(credentials: Credentials) -> Result<Uuid, Error>;
+
+    async fn add_user(user: User, password: String) -> Result<(),Error>;
+    async fn list_users() -> Result<Vec<User>, Error>;
+    async fn update_user(old: User, new: User) -> Result<(), Error>;
 }
 
 #[cfg(test)]

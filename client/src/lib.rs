@@ -1,6 +1,7 @@
 use tokio::net::TcpStream;
 use protocol::tarpc;
-use tarpc::{client, tokio_serde::formats::Json};
+use tarpc::tokio_serde::formats::Json;
+use tarpc::client::Config;
 pub use protocol::WorldClient;
 pub use tarpc::context;
 
@@ -35,6 +36,6 @@ async fn connect_tcp(_domain: &str, port: u16) -> TcpStream {
 pub async fn connect(port: u16) -> WorldClient {
     let stream = connect_tcp("davidsk.dev", port).await;
     let transport = tarpc::serde_transport::Transport::from((stream, Json::default()));
-    let client = WorldClient::new(client::Config::default(), transport).spawn();
+    let client = WorldClient::new(Config::default(), transport).spawn();
     client
 }
