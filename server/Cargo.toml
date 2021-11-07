@@ -1,19 +1,20 @@
 [package]
-name = "client"
+name = "server"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
-tokio-rustls = "0.23.1"
-rustls-native-certs = "0.6"
-
 protocol = { path = "../protocol" }
 futures = { version = "0.3" }
 
-[dev-dependencies]
-server = { path = "../server" }
+rust-argon2 = "0.8"
+rand = "0.8"
+uuid = { version = "0.8", features = ["serde", "v4"] }
+typed-sled = { version = "0.1", git = "https://github.com/dvdsk/typed-sled", branch = "patch-3" }
+serde = { version = "1", features = ["derive"] }
 
 [features]
-deployed = []
+testing = []
