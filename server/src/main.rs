@@ -5,7 +5,7 @@ mod admin_ui;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
-    #[structopt(long)]
+    #[structopt(long, default_value = "8080")]
     port: u16,
     #[structopt(long)]
     admin_ui: bool
@@ -22,6 +22,6 @@ async fn main() {
 
     let db = sled::open("db").unwrap();
     let sessions = Sessions::new();
-    let user_db = UserDb::open(&db);
+    let user_db = UserDb::open(db);
     server::host(sessions, user_db, opt.port).await;
 }

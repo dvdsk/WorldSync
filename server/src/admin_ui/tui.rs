@@ -1,4 +1,4 @@
-use protocol::{tarpc, Error, User};
+use protocol::{tarpc, Error, User, UserId};
 use tarpc::context;
 
 use super::WorldClient;
@@ -61,7 +61,7 @@ impl Tui {
     }
 
     async fn modify_user(&mut self) {
-        let user = match self.pick_user().await {
+        let (id, user) = match self.pick_user().await {
             Err(e) => {
                 println!("could not load user list: {}", e);
                 return;
@@ -69,31 +69,50 @@ impl Tui {
             Ok(user) => user,
         };
 
-        let selection = Select::new()
-            .item("change username")
-            .item("abort")
-            .item("save and exit")
-            .interact()
-            .unwrap();
+        let mut new_user = user.clone();
+        loop {
+            println!("username: {}", new_user.username);
 
-        match selection {
-            0 => change_username(&mut user),
-            1 => return,
-            2 => {
-                self.client.update_user(user);
-                return;
+            let selection = Select::new()
+                .item("change username")
+                .item("abort")
+                .item("save and exit")
+                .interact()
+                .unwrap();
+
+            match selection {
+                0 => change_username(&mut new_user),
+                1 => {
+                    match self
+                        .client
+                        .update_user(context::current(), id, user.clone(), new_user.clone())
+                        .await
+                        .expect("rpc failure")
+                    {
+                        Ok(_) => return,
+                        Err(Error::UserChanged(curr_user)) => {
+                            println!("user changed on server! please edit again");
+                            new_user = curr_user;
+                        }
+                        Err(e) => panic!("unexpected error: {}", e),
+                    }
+                }
+                2 => {
+                    return;
+                }
+                _i => unimplemented!("{}", _i),
             }
         }
     }
 
-    async fn pick_user(&mut self) -> Result<User, Error> {
+    async fn pick_user(&mut self) -> Result<(UserId, User), Error> {
         let mut list = self
             .client
             .list_users(context::current())
             .await
             .expect("rpc failure")?;
 
-        let names: Vec<String> = list.iter().map(|u| u.username.clone()).collect();
+        let names: Vec<String> = list.iter().map(|u| u.1.username.clone()).collect();
         let selection = Select::new()
             .with_prompt("select user to modify")
             .items(&names)

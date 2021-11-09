@@ -13,7 +13,7 @@ futures = { version = "0.3" }
 rust-argon2 = "0.8"
 rand = "0.8"
 uuid = { version = "0.8", features = ["serde", "v4"] }
-typed-sled = { version = "0.1", git = "https://github.com/dvdsk/typed-sled", branch = "patch-3" }
+typed-sled = { version = "0.1", git = "https://github.com/dvdsk/typed-sled" }
 serde = { version = "1", features = ["derive"] }
 structopt = "0.3"
 

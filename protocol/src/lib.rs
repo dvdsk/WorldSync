@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 pub use tarpc;
-use serde::{Serialize, Deserialize};
 pub use uuid::Uuid;
 
 #[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize)]
@@ -10,9 +10,16 @@ pub enum Error {
     Internal,
     #[error("user already exists")]
     AlreadyExists,
+    #[error("user changed while modifying")]
+    UserChanged(User),
+    #[error("user was removed while modifying")]
+    UserRemoved,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+pub type UserId = u64;
+pub type SessionId = Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct User {
     pub username: String,
 }
@@ -29,7 +36,7 @@ pub struct Version {
     pub server: String,
 }
 
-pub fn version() -> &'static str{ 
+pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
@@ -39,11 +46,11 @@ pub fn version() -> &'static str{
 pub trait World {
     /// Returns a greeting for name.
     async fn version() -> Version;
-    async fn log_in(credentials: Credentials) -> Result<Uuid, Error>;
+    async fn log_in(credentials: Credentials) -> Result<SessionId, Error>;
 
-    async fn add_user(user: User, password: String) -> Result<(),Error>;
-    async fn list_users() -> Result<Vec<User>, Error>;
-    async fn update_user(old: User, new: User) -> Result<(), Error>;
+    async fn add_user(user: User, password: String) -> Result<(), Error>;
+    async fn list_users() -> Result<Vec<(UserId,User)>, Error>;
+    async fn update_user(id: UserId, old: User, new: User) -> Result<(), Error>;
 }
 
 #[cfg(test)]

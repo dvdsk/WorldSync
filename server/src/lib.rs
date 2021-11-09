@@ -5,7 +5,6 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Instant;
-use protocol::Error;
 
 use protocol::{tarpc, User, World};
 use tarpc::server::{incoming::Incoming, Channel};
@@ -18,23 +17,24 @@ use db::user::UserDb;
 mod rpc;
 use rpc::ConnState;
 
+type SessionId = Uuid;
 pub struct Session {
     user: User,
-    last_hb: Instant,
+    last_active: Instant,
 }
 
 #[derive(Clone)]
-pub struct Sessions(Arc<RwLock<HashMap<Uuid, Session>>>);
+pub struct Sessions(Arc<RwLock<HashMap<SessionId, Session>>>);
 impl Sessions {
     pub fn new() -> Self {
         Self(Arc::new(RwLock::new(HashMap::new())))
     }
-    fn add(&mut self, user: User) -> Uuid {
+    fn add(&mut self, user: User) -> SessionId {
         let uuid = Uuid::new_v4();
         let mut sessions = self.0.write().unwrap();
         let session = Session {
             user,
-            last_hb: Instant::now(),
+            last_active: Instant::now(),
         };
         sessions.insert(uuid, session);
         uuid
