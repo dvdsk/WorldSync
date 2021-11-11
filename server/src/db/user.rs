@@ -8,8 +8,8 @@ use tokio::time::sleep;
 use typed_sled::CompareAndSwapError;
 use typed_sled::{sled, Tree};
 
-#[derive(Clone, Serialize, Deserialize)]
-struct UserEntry {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserEntry {
     id: UserId,
     user: User,
     passhash: String,
@@ -21,10 +21,16 @@ pub enum Error {
     AlreadyExists,
     #[error("io error accessing database")]
     Db(#[from] sled::Error),
-    #[error("user changed since you started modifying")]
-    Changed(User),
+    #[error("user entry changed since start of modify")]
+    Changed(UserEntry),
     #[error("user has been removed")]
     UserRemoved,
+    #[error("user does not exist")]
+    DoesNotExist,
+    #[error("incorrect password")]
+    IncorrectPass,
+    #[error("incorrect password")]
+    IncorrectName,
 }
 
 impl From<Error> for protocol::Error {
@@ -33,8 +39,14 @@ impl From<Error> for protocol::Error {
         match e {
             AlreadyExists => protocol::Error::AlreadyExists,
             Db(_) => protocol::Error::Internal,
-            Changed(user) => protocol::Error::UserChanged(user),
+            Changed(entry) => protocol::Error::UserChanged(entry.user),
             UserRemoved => protocol::Error::UserRemoved,
+            DoesNotExist => protocol::Error::UserNotInDb,
+            IncorrectPass => protocol::Error::Unauthorized,
+            IncorrectName => unimplemented!(
+                "should not be auto converted but explicitly handled
+                 to prevent accidentily leaking users in database"
+            ),
         }
     }
 }
@@ -70,6 +82,10 @@ impl UserDb {
         self.tree.get(&user_id).map_err(Error::Db)
     }
 
+    pub fn get_user(&self, user_id: UserId) -> DbResult<Option<User>> {
+        self.get_entry(user_id).map(|o| o.map(|e| e.user))
+    }
+
     pub fn get_userlist(&self) -> DbResult<Vec<(UserId, User)>> {
         let res: Result<_, sled::Error> = self
             .tree
@@ -77,7 +93,6 @@ impl UserDb {
             .values()
             .map(|v| v.map(|e| (e.id, e.user)))
             .collect();
-
         Ok(res?)
     }
 
@@ -89,17 +104,50 @@ impl UserDb {
         Ok(())
     }
 
+    pub async fn override_user(&mut self, id: UserId, new: User) -> DbResult<()> {
+        let mut current = self.get_entry(id)?.ok_or(Error::UserRemoved)?;
+        loop {
+            let new_entry = UserEntry {
+                user: new.clone(),
+                ..current.clone()
+            };
+
+            let old_username = current.user.username.clone();
+            match self.update_userentry(id, current, new_entry).await {
+                Ok(_) => {
+                    self.index.remove(&old_username);
+                    self.index.insert(new.username, id);
+                    return Ok(());
+                }
+                Err(Error::Changed(curr)) => current = curr,
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
     pub async fn update_user(&mut self, id: UserId, old: User, new: User) -> DbResult<()> {
         let current = self.get_entry(id)?.ok_or(Error::UserRemoved)?;
-        let new = UserEntry {
+        let new_entry = UserEntry {
             user: new.clone(),
             ..current.clone()
         };
-        let mut expected = UserEntry {
+        let expected = UserEntry {
             user: old.clone(),
             ..current
         };
 
+        self.update_userentry(id, expected, new_entry).await?;
+        self.index.remove(&old.username);
+        self.index.insert(new.username, id);
+        Ok(())
+    }
+
+    async fn update_userentry(
+        &mut self,
+        id: UserId,
+        mut expected: UserEntry,
+        new: UserEntry,
+    ) -> DbResult<()> {
         loop {
             // check if something else then the password changed
             let res = self
@@ -114,7 +162,7 @@ impl UserDb {
                     ..
                 }) => {
                     if curr.user != expected.user {
-                        Err(Error::Changed(curr.user))?
+                        Err(Error::Changed(curr))?
                     } else {
                         curr.passhash
                     }
@@ -123,16 +171,21 @@ impl UserDb {
             expected.passhash = new_hash;
         }
         self.tree.flush_async().await?;
-        self.index.remove(&old.username);
-        self.index.insert(new.user.username, id);
         Ok(())
     }
 
+    pub async fn remove_user(&mut self, id: UserId) -> DbResult<String> {
+        let entry = self.tree.remove(&id)?.ok_or(Error::DoesNotExist)?;
+        self.tree.flush_async().await?;
+        self.index.remove(&entry.user.username);
+        Ok(entry.user.username)
+    }
+
     // SECURITY this function can leak the usernames in the database through timing attack
-    fn validate_credentials_blocking(&self, credentials: Credentials) -> DbResult<Option<User>> {
+    fn validate_credentials_blocking(&self, credentials: Credentials) -> DbResult<UserId> {
         let id = self.index.get(&credentials.username).copied();
         if id.is_none() {
-            return Ok(None);
+            return Err(Error::IncorrectName);
         }
         let id = id.unwrap();
 
@@ -140,14 +193,14 @@ impl UserDb {
             let correct =
                 argon2::verify_encoded(&entry.passhash, credentials.password.as_bytes()).unwrap();
             if correct {
-                return Ok(Some(entry.user));
+                return Ok(entry.id);
             }
         }
-        Ok(None)
+        Err(Error::IncorrectPass)
     }
 
     // SECURITY sleep compensates for possible timing attack that could leak usernames
-    pub async fn validate_credentials(&self, credentials: Credentials) -> DbResult<Option<User>> {
+    pub async fn validate_credentials(&self, credentials: Credentials) -> DbResult<UserId> {
         let userdb = self.clone();
         let validate =
             task::spawn_blocking(move || userdb.validate_credentials_blocking(credentials));
@@ -157,9 +210,11 @@ impl UserDb {
 
     pub async fn add_user(&mut self, user: User, password: impl Into<String>) -> DbResult<()> {
         let id = self.db.generate_id()?;
-        let passhash = encode_pass(password.into()).await;
-        let entry = UserEntry { id, user, passhash };
-        self.add_unique_entry(entry).await
+        let passhash = encode_pass(dbg!(password.into())).await;
+        let entry = UserEntry { id, user: user.clone(), passhash };
+        self.add_unique_entry(entry).await?;
+        self.index.insert(user.username, id); 
+        Ok(())
     }
 }
 

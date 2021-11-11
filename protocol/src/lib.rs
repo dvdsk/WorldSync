@@ -14,6 +14,12 @@ pub enum Error {
     UserChanged(User),
     #[error("user was removed while modifying")]
     UserRemoved,
+    #[error("no user in database with given id")]
+    UserNotInDb,
+    #[error("access restricted")]
+    Unauthorized,
+    #[error("session expired or did not exist")]
+    SessionExpired,
 }
 
 pub type UserId = u64;
@@ -24,7 +30,21 @@ pub struct User {
     pub username: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl User {
+    pub fn test_user(num: u8) -> Self {
+        Self {
+            username: format!("TestUser_{}", num),
+        }
+    }
+    pub fn test_credentials(num: u8) -> Credentials {
+        Credentials {
+            username: Self::test_user(num).username,
+            password: format!("testpass{}", num),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
     pub username: String,
     pub password: String,
@@ -44,13 +64,15 @@ pub fn version() -> &'static str {
 /// It defines one RPC, hello, which takes one arg, name, and returns a String.
 #[tarpc::service]
 pub trait World {
-    /// Returns a greeting for name.
     async fn version() -> Version;
     async fn log_in(credentials: Credentials) -> Result<SessionId, Error>;
+    async fn get_account(uuid: SessionId) -> Result<User, Error>;
+    async fn update_account(uuid: SessionId, new: User) -> Result<(), Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
-    async fn list_users() -> Result<Vec<(UserId,User)>, Error>;
+    async fn list_users() -> Result<Vec<(UserId, User)>, Error>;
     async fn update_user(id: UserId, old: User, new: User) -> Result<(), Error>;
+    async fn remove_user(id: UserId) -> Result<(), Error>;
 }
 
 #[cfg(test)]

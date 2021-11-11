@@ -1,8 +1,18 @@
-use protocol::{tarpc, Error, User, UserId};
+use protocol::{tarpc, User, UserId};
 use tarpc::context;
 
 use super::WorldClient;
-use dialoguer::{Input, Password, Select};
+use dialoguer::{Confirm, Input, Password, Select};
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("server side error: {0}")]
+    Protocol(#[from] protocol::Error),
+    #[error("userlist is empty")]
+    NoUsers,
+    #[error("canceled")]
+    Canceld,
+}
 
 struct Tui {
     client: WorldClient,
@@ -28,6 +38,7 @@ pub async fn main_menu(client: WorldClient) {
         }
     }
 }
+
 impl Tui {
     async fn add_user(&mut self) {
         let validate_username = |input: &String| {
@@ -62,11 +73,16 @@ impl Tui {
 
     async fn modify_user(&mut self) {
         let (id, user) = match self.pick_user().await {
+            Err(Error::Canceld) => return,
+            Err(Error::NoUsers) => {
+                println!("no users to list");
+                return;
+            }
             Err(e) => {
                 println!("could not load user list: {}", e);
                 return;
             }
-            Ok(user) => user,
+            Ok(id_user) => id_user,
         };
 
         let mut new_user = user.clone();
@@ -82,7 +98,8 @@ impl Tui {
 
             match selection {
                 0 => change_username(&mut new_user),
-                1 => {
+                1 => return,
+                2 => {
                     match self
                         .client
                         .update_user(context::current(), id, user.clone(), new_user.clone())
@@ -90,18 +107,41 @@ impl Tui {
                         .expect("rpc failure")
                     {
                         Ok(_) => return,
-                        Err(Error::UserChanged(curr_user)) => {
+                        Err(protocol::Error::UserChanged(curr_user)) => {
                             println!("user changed on server! please edit again");
                             new_user = curr_user;
                         }
                         Err(e) => panic!("unexpected error: {}", e),
                     }
                 }
-                2 => {
-                    return;
-                }
                 _i => unimplemented!("{}", _i),
             }
+        }
+    }
+
+    async fn remove_user(&mut self) {
+        let (id, user) = match self.pick_user().await {
+            Err(Error::Canceld) => return,
+            Err(Error::NoUsers) => {
+                println!("no users to list");
+                return;
+            }
+            Err(e) => {
+                println!("could not load user list: {}", e);
+                return;
+            }
+            Ok(id_user) => id_user,
+        };
+
+        let prompt = format!("delete user: '{}'", user.username);
+        if Confirm::new().with_prompt(prompt).interact().unwrap() {
+            self.client
+                .remove_user(context::current(), id)
+                .await
+                .expect("rpc failure")
+                .unwrap();
+        } else {
+            println!("canceld removal");
         }
     }
 
@@ -112,16 +152,25 @@ impl Tui {
             .await
             .expect("rpc failure")?;
 
-        let names: Vec<String> = list.iter().map(|u| u.1.username.clone()).collect();
+        if list.is_empty() {
+            return Err(Error::NoUsers);
+        }
+
+        let names: Vec<String> = list.iter()
+            .map(|u| format!("\"{}\"", u.1.username)).collect();
         let selection = Select::new()
             .with_prompt("select user to modify")
             .items(&names)
+            .item("cancel")
             .interact()
             .unwrap();
+
+        if selection == list.len() {
+            return Err(Error::Canceld);
+        }
+
         Ok(list.remove(selection))
     }
-
-    async fn remove_user(&mut self) {}
 }
 
 fn change_username(user: &mut User) {

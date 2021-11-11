@@ -20,6 +20,9 @@ async fn main() {
         return 
     }
 
+    let subscriber = tracing_subscriber::fmt()
+        .finish();
+
     let db = sled::open("db").unwrap();
     let sessions = Sessions::new();
     let user_db = UserDb::open(db);

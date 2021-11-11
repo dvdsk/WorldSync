@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Instant;
 
-use protocol::{tarpc, User, World};
+use protocol::{tarpc, User, World, UserId};
 use tarpc::server::{incoming::Incoming, Channel};
 use tarpc::tokio_serde::formats::Json;
 use uuid::Uuid;
@@ -19,7 +19,7 @@ use rpc::ConnState;
 
 type SessionId = Uuid;
 pub struct Session {
-    user: User,
+    user_id: UserId,
     last_active: Instant,
 }
 
@@ -29,11 +29,11 @@ impl Sessions {
     pub fn new() -> Self {
         Self(Arc::new(RwLock::new(HashMap::new())))
     }
-    fn add(&mut self, user: User) -> SessionId {
+    fn add(&mut self, user_id: UserId) -> SessionId {
         let uuid = Uuid::new_v4();
         let mut sessions = self.0.write().unwrap();
         let session = Session {
-            user,
+            user_id,
             last_active: Instant::now(),
         };
         sessions.insert(uuid, session);

@@ -9,7 +9,7 @@ pub use tarpc::context;
 use tokio_rustls::{rustls, TlsConnector, client::TlsStream};
 
 #[cfg(feature = "deployed")]
-async fn connect_tcp(domain: &str, port: u16) -> TlsStream<TcpStream> {
+async fn connect_tcp(domain: &str, port: u16) -> Result<TlsStream<TcpStream>, std::io::Error>{
     use std::sync::Arc;
 
     let mut roots = rustls::RootCertStore::empty();
@@ -24,18 +24,18 @@ async fn connect_tcp(domain: &str, port: u16) -> TlsStream<TcpStream> {
     let servername = rustls::ServerName::try_from(domain).unwrap();
 
     let host = format!("{}:{}", domain, port);
-    let stream = TcpStream::connect(host).await.unwrap();
+    let stream = TcpStream::connect(host).await?;
     connector.connect(servername, stream).await.unwrap()
 }
 
 #[cfg(not(feature = "deployed"))]
-async fn connect_tcp(_domain: &str, port: u16) -> TcpStream {
-    TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap()
+async fn connect_tcp(_domain: &str, port: u16) -> Result<TcpStream, std::io::Error> {
+    TcpStream::connect(format!("127.0.0.1:{}", port)).await
 }
 
-pub async fn connect(port: u16) -> WorldClient {
-    let stream = connect_tcp("davidsk.dev", port).await;
+pub async fn connect(port: u16) -> Result<WorldClient, std::io::Error> {
+    let stream = connect_tcp("davidsk.dev", port).await?;
     let transport = tarpc::serde_transport::Transport::from((stream, Json::default()));
     let client = WorldClient::new(Config::default(), transport).spawn();
-    client
+    Ok(client)
 }
