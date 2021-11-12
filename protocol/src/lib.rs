@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 pub use tarpc;
 pub use uuid::Uuid;
 
-#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Error {
     #[error("wrong username or password")]
     IncorrectLogin,
@@ -33,21 +33,15 @@ pub struct User {
 impl User {
     pub fn test_user(num: u8) -> Self {
         Self {
-            username: format!("TestUser_{}", num),
+            username: Self::test_username(num),
         }
     }
-    pub fn test_credentials(num: u8) -> Credentials {
-        Credentials {
-            username: Self::test_user(num).username,
-            password: format!("testpass{}", num),
-        }
+    pub fn test_username(num: u8) -> String {
+        format!("TestUser_{}", num)
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Credentials {
-    pub username: String,
-    pub password: String,
+    pub fn test_password(num: u8) -> String {
+        format!("testpass{}", num)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -65,14 +59,17 @@ pub fn version() -> &'static str {
 #[tarpc::service]
 pub trait World {
     async fn version() -> Version;
-    async fn log_in(credentials: Credentials) -> Result<SessionId, Error>;
-    async fn get_account(uuid: SessionId) -> Result<User, Error>;
-    async fn update_account(uuid: SessionId, new: User) -> Result<(), Error>;
+    async fn log_in(username: String, password: String) -> Result<SessionId, Error>;
+    async fn get_account(id: SessionId) -> Result<User, Error>;
+    async fn update_account(id: SessionId, new: User) -> Result<(), Error>;
+    async fn update_password(id: SessionId, new: String) -> Result<(), Error>;
+    async fn close_account(id: SessionId) -> Result<(), Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
     async fn list_users() -> Result<Vec<(UserId, User)>, Error>;
-    async fn update_user(id: UserId, old: User, new: User) -> Result<(), Error>;
-    async fn remove_user(id: UserId) -> Result<(), Error>;
+    async fn override_account(id: UserId, old: User, new: User) -> Result<(), Error>;
+    async fn override_password(id: UserId, new: String) -> Result<(), Error>;
+    async fn remove_account(id: UserId) -> Result<(), Error>;
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use protocol::{Credentials, User, UserId};
+use protocol::{User, UserId};
 use serde::{Deserialize, Serialize};
 use tokio::task;
 use tokio::time::sleep;
@@ -84,6 +84,10 @@ impl UserDb {
 
     pub fn get_user(&self, user_id: UserId) -> DbResult<Option<User>> {
         self.get_entry(user_id).map(|o| o.map(|e| e.user))
+    }
+
+    pub fn get_user_id(&self, username: &str) -> Option<UserId> {
+        self.index.get(username).copied()
     }
 
     pub fn get_userlist(&self) -> DbResult<Vec<(UserId, User)>> {
@@ -182,16 +186,9 @@ impl UserDb {
     }
 
     // SECURITY this function can leak the usernames in the database through timing attack
-    fn validate_credentials_blocking(&self, credentials: Credentials) -> DbResult<UserId> {
-        let id = self.index.get(&credentials.username).copied();
-        if id.is_none() {
-            return Err(Error::IncorrectName);
-        }
-        let id = id.unwrap();
-
-        if let Some(entry) = self.get_entry(id)? {
-            let correct =
-                argon2::verify_encoded(&entry.passhash, credentials.password.as_bytes()).unwrap();
+    fn validate_credentials_blocking(&self, user_id: UserId, password: String) -> DbResult<UserId> {
+        if let Some(entry) = self.get_entry(user_id)? {
+            let correct = argon2::verify_encoded(&entry.passhash, password.as_bytes()).unwrap();
             if correct {
                 return Ok(entry.id);
             }
@@ -200,20 +197,44 @@ impl UserDb {
     }
 
     // SECURITY sleep compensates for possible timing attack that could leak usernames
-    pub async fn validate_credentials(&self, credentials: Credentials) -> DbResult<UserId> {
+    pub async fn validate_credentials(
+        &self,
+        user_id: UserId,
+        password: String,
+    ) -> DbResult<UserId> {
         let userdb = self.clone();
         let validate =
-            task::spawn_blocking(move || userdb.validate_credentials_blocking(credentials));
+            task::spawn_blocking(move || userdb.validate_credentials_blocking(user_id, password));
         let (res, _) = tokio::join!(validate, sleep(Duration::from_millis(100)));
         res.expect("could not rejoin thread")
     }
 
+    pub async fn change_password(&self, id: UserId, new: String) -> DbResult<()> {
+        let passhash = encode_pass(new).await;
+        self.tree
+            .fetch_and_update(&id, |entry| match entry {
+                Some(mut entry) => {
+                    entry.passhash = passhash.clone();
+                    Some(entry)
+                }
+                None => None,
+            })?
+            .ok_or(Error::DoesNotExist)?;
+        self.tree.flush_async().await?;
+        Ok(())
+    }
+
     pub async fn add_user(&mut self, user: User, password: impl Into<String>) -> DbResult<()> {
         let id = self.db.generate_id()?;
-        let passhash = encode_pass(dbg!(password.into())).await;
-        let entry = UserEntry { id, user: user.clone(), passhash };
+        let passhash = encode_pass(password.into()).await;
+        let entry = UserEntry {
+            id,
+            user: user.clone(),
+            passhash,
+        };
         self.add_unique_entry(entry).await?;
-        self.index.insert(user.username, id); 
+        self.tree.flush_async().await?;
+        self.index.insert(user.username, id);
         Ok(())
     }
 }

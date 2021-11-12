@@ -14,8 +14,8 @@ pub enum Error {
     Canceld,
 }
 
-struct Tui {
-    client: WorldClient,
+pub struct Tui {
+    pub client: WorldClient,
 }
 
 pub async fn main_menu(client: WorldClient) {
@@ -86,11 +86,18 @@ impl Tui {
         };
 
         let mut new_user = user.clone();
+        let mut password = None;
         loop {
+            println!("id: {}", id);
             println!("username: {}", new_user.username);
+            println!(
+                "password: {}",
+                password.clone().unwrap_or("[unchanged]".to_owned())
+            );
 
             let selection = Select::new()
                 .item("change username")
+                .item("change password")
                 .item("abort")
                 .item("save and exit")
                 .interact()
@@ -98,21 +105,14 @@ impl Tui {
 
             match selection {
                 0 => change_username(&mut new_user),
-                1 => return,
-                2 => {
-                    match self
-                        .client
-                        .update_user(context::current(), id, user.clone(), new_user.clone())
-                        .await
-                        .expect("rpc failure")
-                    {
-                        Ok(_) => return,
-                        Err(protocol::Error::UserChanged(curr_user)) => {
-                            println!("user changed on server! please edit again");
-                            new_user = curr_user;
-                        }
-                        Err(e) => panic!("unexpected error: {}", e),
-                    }
+                1 => change_password(&mut password),
+                2 => return,
+                3 => {
+                    self.override_password(id, password.clone()).await;
+                    let done = self.override_account(id, user.clone(), &mut new_user).await;
+                    if done {
+                        return;
+                    };
                 }
                 _i => unimplemented!("{}", _i),
             }
@@ -136,7 +136,7 @@ impl Tui {
         let prompt = format!("delete user: '{}'", user.username);
         if Confirm::new().with_prompt(prompt).interact().unwrap() {
             self.client
-                .remove_user(context::current(), id)
+                .remove_account(context::current(), id)
                 .await
                 .expect("rpc failure")
                 .unwrap();
@@ -156,8 +156,10 @@ impl Tui {
             return Err(Error::NoUsers);
         }
 
-        let names: Vec<String> = list.iter()
-            .map(|u| format!("\"{}\"", u.1.username)).collect();
+        let names: Vec<String> = list
+            .iter()
+            .map(|u| format!("\"{}\"", u.1.username))
+            .collect();
         let selection = Select::new()
             .with_prompt("select user to modify")
             .items(&names)
@@ -194,5 +196,28 @@ fn change_username(user: &mut User) {
         println!("canceling")
     } else {
         user.username = new_name
+    }
+}
+
+fn change_password(pass: &mut Option<String>) {
+    let validate_password = |input: &String| {
+        if input.len() > 10 || input.is_empty() {
+            Ok(())
+        } else {
+            Err("password with less then 10 characters are not allowed")
+        }
+    };
+
+    let new_pass: String = Input::new()
+        .with_prompt("change password")
+        .validate_with(validate_password)
+        .allow_empty(true)
+        .interact()
+        .unwrap();
+
+    if new_pass.is_empty() {
+        println!("canceling")
+    } else {
+        *pass = Some(new_pass)
     }
 }

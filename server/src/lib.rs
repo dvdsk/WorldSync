@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Instant;
 
-use protocol::{tarpc, User, World, UserId};
+use protocol::{tarpc, World, UserId};
 use tarpc::server::{incoming::Incoming, Channel};
 use tarpc::tokio_serde::formats::Json;
 use uuid::Uuid;

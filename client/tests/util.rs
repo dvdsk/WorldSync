@@ -39,7 +39,7 @@ pub async fn test_server(port: u16) {
     use protocol::User;
     for i in 0..10 {
         userdb
-            .add_user(User::test_user(i), User::test_credentials(i).password)
+            .add_user(User::test_user(i), User::test_password(i))
             .await
             .expect("could not add test users");
     }
