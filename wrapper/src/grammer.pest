@@ -1,0 +1,17 @@
+hour = { ASCII_DIGIT{2} }
+minute = { ASCII_DIGIT{2} }
+second = { ASCII_DIGIT{2} }
+time = { "[" ~ hour ~ ":" ~ minute ~ ":" ~ second ~ "]" }
+source_char	= _{ ASCII_ALPHANUMERIC | "-" | " " }
+source = { source_char+ }
+level = { "INFO" | "WARN" }
+percentage = { ASCII_DIGIT{1,3} }
+preparing_spawn = { "Preparing spawn area: " ~ percentage ~ "%" }
+duration_1 = { ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+done = { "Done ("~ duration_1 ~"s)! For help, type \"help\"" }
+duration_2 = { ASCII_DIGIT+ }
+ticks = { ASCII_DIGIT+ }
+overloaded = { "Can't keep up! Is the server overloaded? Running "~ duration_2 ~ "ms or " ~  ticks ~" ticks behind" }
+other = { ANY+ }
+msg = { preparing_spawn | done | overloaded | other }
+l = { SOI ~ time ~ " [" ~ source ~ "/" ~ level ~ "]: " ~ msg ~ EOI }
