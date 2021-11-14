@@ -5,6 +5,10 @@ use tarpc::client::Config;
 pub use protocol::WorldClient;
 pub use tarpc::context;
 
+mod error;
+pub use error::Error;
+pub mod mc;
+
 #[cfg(feature = "deployed")]
 use tokio_rustls::{rustls, TlsConnector, client::TlsStream};
 

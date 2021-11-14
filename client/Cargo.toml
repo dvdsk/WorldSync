@@ -11,11 +11,16 @@ rustls-native-certs = "0.6"
 
 protocol = { path = "../protocol" }
 futures = { version = "0.3" }
+thiserror = "1"
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["registry"] }
+iced = { version = "0.3" }
+wrapper = { path = "../wrapper" }
 
 [dev-dependencies]
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["registry"] }
-tracing-line-filter = "0.1"
 server = { path = "../server" }
 
 [features]
