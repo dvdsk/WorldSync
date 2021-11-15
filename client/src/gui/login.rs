@@ -1,4 +1,5 @@
 use crate::Event as Msg;
+use crate::gui::style;
 use iced::widget::Column;
 use iced::{button, text_input, Button, Checkbox, Command, Length, Row, Space, TextInput};
 use iced::{Align, Element, HorizontalAlignment, Text};
@@ -59,6 +60,7 @@ pub struct Page {
     inputs: Inputs,
     submit: button::State,
     remember: bool,
+    logging_in: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -83,11 +85,12 @@ impl Page {
             Event::Password(s) => inputs.password.value = s,
             Event::RememberToggle(value) => self.remember = value,
             Event::Submit => {
-                dbg!(
+                self.logging_in = true;
+                Command::from(connect_and_login(
                     &inputs.server.value,
                     &inputs.username.value,
                     &inputs.password.value
-                );
+                ))
             }
         }
         Command::none()
@@ -106,7 +109,7 @@ impl Page {
             .push(Space::with_height(Length::FillPortion(1)))
             .push(inputs)
             .push(Space::with_height(Length::FillPortion(1)))
-            .push(login_button(&mut self.submit))
+            .push(login_button(&mut self.submit, self.logging_in))
             .push(remember_me(self.remember))
             .push(Space::with_height(Length::FillPortion(2)));
 
@@ -128,6 +131,13 @@ fn right_text(text: &str) -> Text {
     Text::new(text).horizontal_alignment(HorizontalAlignment::Right)
 }
 
-fn login_button(state: &mut button::State) -> Button<Msg> {
-    Button::new(state, Text::new("Login")).on_press(Msg::LoginEvent(Event::Submit))
+fn login_button(state: &mut button::State, logging_in: bool) -> Button<Msg> {
+    let button_style = if logging_in {
+        style::Button::Blocked
+    } else {
+        style::Button::Clickable
+    };
+    Button::new(state, Text::new("Login"))
+        .on_press(Msg::LoginEvent(Event::Submit))
+        .style(button_style)
 }

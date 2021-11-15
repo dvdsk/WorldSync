@@ -5,9 +5,9 @@ use tarpc::client::Config;
 pub use protocol::WorldClient;
 pub use tarpc::context;
 
+pub mod mc;
 mod error;
 pub use error::Error;
-pub mod mc;
 
 #[cfg(feature = "deployed")]
 use tokio_rustls::{rustls, TlsConnector, client::TlsStream};
@@ -42,4 +42,8 @@ pub async fn connect(port: u16) -> Result<WorldClient, std::io::Error> {
     let transport = tarpc::serde_transport::Transport::from((stream, Json::default()));
     let client = WorldClient::new(Config::default(), transport).spawn();
     Ok(client)
+}
+
+pub async fn connect_and_login(server_address: &str, username: &str, password: &str) -> Msg {
+
 }

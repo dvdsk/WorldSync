@@ -9,5 +9,7 @@ edition = "2021"
 tokio = {version = "1", features = ["process", "io-util", "macros", "rt", "fs", "time"]}
 # tokio-stream = {version ="0.1", features = ["io-util"]}
 thiserror = "1"
-pest = "2"
-pest_derive = "2"
+peg = "0.7"
+time = "0.3"
+# pest = "2"
+# pest_derive = "2"
