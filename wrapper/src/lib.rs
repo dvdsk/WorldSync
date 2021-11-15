@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 
-mod parser;
+pub mod parser;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
