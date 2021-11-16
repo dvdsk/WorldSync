@@ -6,7 +6,10 @@ pub use protocol::WorldClient;
 pub use tarpc::context;
 
 pub mod mc;
+pub mod gui;
 mod error;
+mod events;
+pub use events::Event;
 pub use error::Error;
 
 #[cfg(feature = "deployed")]
@@ -37,13 +40,34 @@ async fn connect_tcp(_domain: &str, port: u16) -> Result<TcpStream, std::io::Err
     TcpStream::connect(format!("127.0.0.1:{}", port)).await
 }
 
-pub async fn connect(port: u16) -> Result<WorldClient, std::io::Error> {
+pub async fn connect(domain: &str, port: u16) -> Result<WorldClient, std::io::Error> {
     let stream = connect_tcp("davidsk.dev", port).await?;
     let transport = tarpc::serde_transport::Transport::from((stream, Json::default()));
     let client = WorldClient::new(Config::default(), transport).spawn();
     Ok(client)
 }
 
-pub async fn connect_and_login(server_address: &str, username: &str, password: &str) -> Msg {
+pub async fn connect_and_login(domain: String, port: u16, username: String, password: String) -> Event {
+    let client = match connect(&domain, port).await {
+        Err(_) => {
+            todo!("logic to get usefull Event::Error with error type inside");
+            // return Event::Error
+        },
+        Ok(c) => c,
+    };
 
+    let session_id = match client
+        .log_in(context::current(), username, password)
+        .await {
+        Err(_) => {
+            todo!("logic to get usefull Event::Error with error type inside");
+            // return Event::Error
+        },
+        Ok(Err(_)) => {
+            todo!("logic to get usefull Event::Error with error type inside");
+        }
+        Ok(Ok(id)) => id,
+    };
+
+    Event::LoggedIn(client, session_id)
 }

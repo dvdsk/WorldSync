@@ -1,8 +1,10 @@
-use crate::Event as Msg;
 use crate::gui::style;
+pub use crate::Event as Msg;
 use iced::widget::Column;
 use iced::{button, text_input, Button, Checkbox, Command, Length, Row, Space, TextInput};
 use iced::{Align, Element, HorizontalAlignment, Text};
+
+mod tasks;
 
 #[derive(Default)]
 struct InputState {
@@ -61,6 +63,7 @@ pub struct Page {
     submit: button::State,
     remember: bool,
     logging_in: bool,
+    error: Option<&'static str>,
 }
 
 #[derive(Debug, Clone)]
@@ -84,20 +87,13 @@ impl Page {
             Event::Username(s) => inputs.username.value = s,
             Event::Password(s) => inputs.password.value = s,
             Event::RememberToggle(value) => self.remember = value,
-            Event::Submit => {
-                self.logging_in = true;
-                Command::from(connect_and_login(
-                    &inputs.server.value,
-                    &inputs.username.value,
-                    &inputs.password.value
-                ))
-            }
+            Event::Submit => return self.on_submit(),
         }
         Command::none()
     }
 
     pub fn view(&mut self) -> Element<Msg> {
-        let inputs = self.inputs.view().map(move |e| Msg::LoginEvent(e));
+        let inputs = self.inputs.view().map(move |e| Msg::LoginPage(e));
         let title = Text::new("WorldSync")
             .width(Length::FillPortion(1))
             .horizontal_alignment(HorizontalAlignment::Center);
@@ -123,7 +119,7 @@ impl Page {
 
 fn remember_me(is_checked: bool) -> Checkbox<Msg> {
     Checkbox::new(is_checked, "Keep me logged in", |b| {
-        Msg::LoginEvent(Event::RememberToggle(b))
+        Msg::LoginPage(Event::RememberToggle(b))
     })
 }
 
@@ -138,6 +134,6 @@ fn login_button(state: &mut button::State, logging_in: bool) -> Button<Msg> {
         style::Button::Clickable
     };
     Button::new(state, Text::new("Login"))
-        .on_press(Msg::LoginEvent(Event::Submit))
+        .on_press(Msg::LoginPage(Event::Submit))
         .style(button_style)
 }
