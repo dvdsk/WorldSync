@@ -82,7 +82,7 @@ impl Page {
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         let inputs = &mut self.inputs;
-        match event {
+        match dbg!(event) {
             Event::Servername(s) => inputs.server.value = s,
             Event::Username(s) => inputs.username.value = s,
             Event::Password(s) => inputs.password.value = s,

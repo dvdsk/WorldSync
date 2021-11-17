@@ -24,9 +24,11 @@ impl Page {
                 );
                 Command::perform(task, move |msg| msg);
             }
-            Err(error_str) => self.error = Some(error_str),
+            Err(error_str) => {
+                tracing::warn!(error_str);
+                self.error = Some(error_str);
+            }
         }
-
         Command::none()
     }
 }
