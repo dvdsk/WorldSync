@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::gui::style;
 pub use crate::Event as Msg;
 use iced::widget::Column;
@@ -6,17 +8,57 @@ use iced::{Align, Element, HorizontalAlignment, Text};
 
 mod tasks;
 
+#[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Error {
+    #[error("Not a server, please check the address")]
+    InvalidFormat,
+    #[error("Port is not a number, please check the address")]
+    NotANumber,
+    #[error("Could not connect to WorldSync server")]
+    NoMetaConn,
+    #[error("Invalid username or password")]
+    IncorrectLogin,
+}
+
+impl From<protocol::Error> for Error {
+    fn from(e: protocol::Error) -> Self {
+        if let protocol::Error::IncorrectLogin = e {
+            Error::IncorrectLogin
+        } else {
+            panic!("should not run into {:?} on login page", e)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    Servername(String),
+    Username(String),
+    Password(String),
+    RememberToggle(bool),
+    Submit,
+    Error(Error),
+    ClearError(Error),
+}
+
 #[derive(Default)]
-struct InputState {
+struct Input {
     button: text_input::State,
     value: String,
+    style: style::Input,
+}
+
+impl Input {
+    fn view<F: 'static + Fn(String) -> Event>(&mut self, event: F) -> TextInput<Event> {
+        TextInput::new(&mut self.button, &self.value, &self.value, event).style(self.style)
+    }
 }
 
 #[derive(Default)]
 struct Inputs {
-    server: InputState,
-    username: InputState,
-    password: InputState,
+    server: Input,
+    username: Input,
+    password: Input,
 }
 
 impl Inputs {
@@ -27,27 +69,13 @@ impl Inputs {
             .push(right_text("Password:"));
         let text_inputs = Column::new()
             .width(Length::FillPortion(1))
-            .push(TextInput::new(
-                &mut self.server.button,
-                &self.server.value,
-                &self.server.value,
-                Event::Servername,
-            ))
-            .push(TextInput::new(
-                &mut self.username.button,
-                &self.username.value,
-                &self.username.value,
-                Event::Username,
-            ))
+            .push(self.server.view(Event::Servername))
+            .push(self.username.view(Event::Username))
             .push(
-                TextInput::new(
-                    &mut self.password.button,
-                    &self.password.value,
-                    &self.password.value,
-                    Event::Password,
-                )
-                .password()
-                .on_submit(Event::Submit),
+                self.password
+                    .view(Event::Password)
+                    .password()
+                    .on_submit(Event::Submit),
             );
         Row::new()
             .push(texts)
@@ -58,21 +86,40 @@ impl Inputs {
 }
 
 #[derive(Default)]
+struct ErrorBar(HashMap<Error, button::State>);
+
+impl ErrorBar {
+    pub fn add(&mut self, err: Error) {
+        self.0.insert(err, button::State::new());
+    }
+    pub fn clear(&mut self, err: Error) {
+        self.0.remove(&err);
+    }
+    pub fn view(&mut self) -> Element<Event> {
+        let mut column = Column::new();
+        for (err, button_state) in self.0.iter_mut() {
+            let button =
+                Button::new(button_state, Text::new('x')).on_press(Event::ClearError(err.clone()));
+            let text = Text::new(err.to_string()).horizontal_alignment(HorizontalAlignment::Left);
+            column = column.push(
+                Row::new()
+                    .width(Length::Fill)
+                    .align_items(Align::Center)
+                    .push(button)
+                    .push(text)
+            );
+        }
+        column.into()
+    }
+}
+
+#[derive(Default)]
 pub struct Page {
     inputs: Inputs,
+    errorbar: ErrorBar,
     submit: button::State,
     remember: bool,
     logging_in: bool,
-    error: Option<&'static str>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Event {
-    Servername(String),
-    Username(String),
-    Password(String),
-    RememberToggle(bool),
-    Submit,
 }
 
 impl Page {
@@ -83,11 +130,22 @@ impl Page {
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         let inputs = &mut self.inputs;
         match dbg!(event) {
-            Event::Servername(s) => inputs.server.value = s,
-            Event::Username(s) => inputs.username.value = s,
-            Event::Password(s) => inputs.password.value = s,
+            Event::Servername(s) => {
+                inputs.server.value = s;
+                inputs.server.style = style::Input::Ok;
+            }
+            Event::Username(s) => {
+                inputs.username.value = s;
+                inputs.server.style = style::Input::Ok;
+            }
+            Event::Password(s) => {
+                inputs.password.value = s;
+                inputs.server.style = style::Input::Ok;
+            }
             Event::RememberToggle(value) => self.remember = value,
             Event::Submit => return self.on_submit(),
+            Event::Error(e) => return self.handle_err(e),
+            Event::ClearError(e) => self.errorbar.clear(e),
         }
         Command::none()
     }
@@ -97,6 +155,7 @@ impl Page {
         let title = Text::new("WorldSync")
             .width(Length::FillPortion(1))
             .horizontal_alignment(HorizontalAlignment::Center);
+
         let column = Column::new()
             .align_items(Align::Center)
             .width(Length::FillPortion(8))
@@ -109,10 +168,15 @@ impl Page {
             .push(remember_me(self.remember))
             .push(Space::with_height(Length::FillPortion(2)));
 
-        Row::new()
+        let main_ui = Row::new()
             .push(Space::with_width(Length::FillPortion(3)))
             .push(column)
-            .push(Space::with_width(Length::FillPortion(3)))
+            .push(Space::with_width(Length::FillPortion(3)));
+        let errorbar = self.errorbar.view().map(move |e| Msg::LoginPage(e));
+        Column::new()
+            .width(Length::Fill)
+            .push(errorbar)
+            .push(main_ui)
             .into()
     }
 }

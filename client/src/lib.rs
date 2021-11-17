@@ -1,22 +1,22 @@
-use tokio::net::TcpStream;
 use protocol::tarpc;
-use tarpc::tokio_serde::formats::Json;
-use tarpc::client::Config;
 pub use protocol::WorldClient;
+use tarpc::client::Config;
 pub use tarpc::context;
+use tarpc::tokio_serde::formats::Json;
+use tokio::net::TcpStream;
 
-pub mod mc;
-pub mod gui;
 mod error;
 mod events;
-pub use events::Event;
+pub mod gui;
+pub mod mc;
 pub use error::Error;
+pub use events::Event;
 
 #[cfg(feature = "deployed")]
-use tokio_rustls::{rustls, TlsConnector, client::TlsStream};
+use tokio_rustls::{client::TlsStream, rustls, TlsConnector};
 
 #[cfg(feature = "deployed")]
-async fn connect_tcp(domain: &str, port: u16) -> Result<TlsStream<TcpStream>, std::io::Error>{
+async fn connect_tcp(domain: &str, port: u16) -> Result<TlsStream<TcpStream>, std::io::Error> {
     use std::sync::Arc;
 
     let mut roots = rustls::RootCertStore::empty();
@@ -45,29 +45,4 @@ pub async fn connect(domain: &str, port: u16) -> Result<WorldClient, std::io::Er
     let transport = tarpc::serde_transport::Transport::from((stream, Json::default()));
     let client = WorldClient::new(Config::default(), transport).spawn();
     Ok(client)
-}
-
-pub async fn connect_and_login(domain: String, port: u16, username: String, password: String) -> Event {
-    let client = match connect(&domain, port).await {
-        Err(_) => {
-            todo!("logic to get usefull Event::Error with error type inside");
-            // return Event::Error
-        },
-        Ok(c) => c,
-    };
-
-    let session_id = match client
-        .log_in(context::current(), username, password)
-        .await {
-        Err(_) => {
-            todo!("logic to get usefull Event::Error with error type inside");
-            // return Event::Error
-        },
-        Ok(Err(_)) => {
-            todo!("logic to get usefull Event::Error with error type inside");
-        }
-        Ok(Ok(id)) => id,
-    };
-
-    Event::LoggedIn(client, session_id)
 }

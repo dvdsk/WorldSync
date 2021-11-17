@@ -1,5 +1,5 @@
 use crate::Event;
-use iced::{executor, Application, Clipboard, Command, Element, Settings, Text};
+use iced::{executor, Application, Clipboard, Command, Element};
 
 pub mod login;
 mod style;
