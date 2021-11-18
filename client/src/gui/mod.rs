@@ -2,10 +2,16 @@ use crate::Event;
 use iced::{executor, Application, Clipboard, Command, Element};
 
 pub mod login;
+mod host;
+mod hosting;
+mod join;
 mod style;
 
 pub struct State {
     login: login::Page,
+    hosting: hosting::Page,
+    host: host::Page,
+    join: join::Page,
     page: Page,
 }
 
@@ -13,6 +19,9 @@ impl State {
     fn new() -> Self {
         Self {
             login: login::Page::new(),
+            hosting: hosting::Page::new(),
+            host: host::Page::new(),
+            join: join::Page::new(),
             page: Page::Login,
         }
     }
@@ -20,6 +29,9 @@ impl State {
 
 enum Page {
     Login,
+    Hosting,
+    Host,
+    Join,
 }
 
 impl Application for State {
@@ -52,6 +64,9 @@ impl Application for State {
     fn view(&mut self) -> Element<Event> {
         match self.page {
             Page::Login => self.login.view(),
+            Page::Join => self.join.view(),
+            Page::Host => self.host.view(),
+            Page::Hosting => self.hosting.view(),
         }
     }
 }
