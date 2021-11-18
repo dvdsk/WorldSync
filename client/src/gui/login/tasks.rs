@@ -54,12 +54,14 @@ impl Page {
 
     pub fn handle_err(&mut self, e: Error) -> Command<Msg> {
         match e {
-            Error::InvalidFormat => {
-                self.inputs.server.style = style::Input::Err;
-                self.errorbar.add(e);
+            Error::NoMetaConn | Error::NotANumber |
+            Error::InvalidFormat => self.inputs.server.style = style::Input::Err,
+            Error::IncorrectLogin => {
+                self.inputs.username.style = style::Input::Err;
+                self.inputs.password.style = style::Input::Err;
             }
-            _ => todo!("{:?}", e),
         }
+        self.errorbar.add(e);
         Command::none()
     }
 }

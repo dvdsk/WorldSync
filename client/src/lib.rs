@@ -41,7 +41,7 @@ async fn connect_tcp(_domain: &str, port: u16) -> Result<TcpStream, std::io::Err
 }
 
 pub async fn connect(domain: &str, port: u16) -> Result<WorldClient, std::io::Error> {
-    let stream = connect_tcp("davidsk.dev", port).await?;
+    let stream = connect_tcp(domain, port).await?;
     let transport = tarpc::serde_transport::Transport::from((stream, Json::default()));
     let client = WorldClient::new(Config::default(), transport).spawn();
     Ok(client)

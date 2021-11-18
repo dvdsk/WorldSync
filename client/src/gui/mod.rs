@@ -55,7 +55,9 @@ impl Application for State {
         use Event::*;
         match message {
             LoginPage(event) => return self.login.update(event),
-            LoggedIn(client, uuid) => eprintln!("logged_in"),
+            LoggedIn(client, uuid) => {
+                eprintln!("logged_in");
+            }
             Error => eprintln!("tmp error remove when error handling in place"),
         }
         Command::none()

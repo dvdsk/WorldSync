@@ -15,7 +15,7 @@ thiserror = "1"
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["registry"] }
-iced = { version = "0.3" }
+iced = { version = "0.3" , features = ["tokio"] }
 wrapper = { path = "../wrapper" }
 
 [dev-dependencies]

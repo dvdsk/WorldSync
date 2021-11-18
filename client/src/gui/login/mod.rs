@@ -106,7 +106,7 @@ impl ErrorBar {
                     .width(Length::Fill)
                     .align_items(Align::Center)
                     .push(button)
-                    .push(text)
+                    .push(text),
             );
         }
         column.into()
@@ -124,7 +124,24 @@ pub struct Page {
 
 impl Page {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            #[cfg(not(deployed))]
+            inputs: Inputs {
+                server: Input {
+                    value: "127.0.0.1:8080".to_owned(),
+                    ..Input::default()
+                },
+                username: Input {
+                    value: "TestUser_0".to_owned(),
+                    ..Input::default()
+                },
+                password: Input {
+                    value: "testpass0".to_owned(),
+                    ..Input::default()
+                },
+            },
+            ..Self::default()
+        }
     }
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {

@@ -1,18 +1,18 @@
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::time::Duration;
-use tokio::time::sleep;
+use std::thread;
 
-static FREE_PORT: AtomicU16 = AtomicU16::new(8080);
-pub fn free_port() -> u16 {
-    FREE_PORT.fetch_add(1, Ordering::Relaxed)
-}
+use client::gui;
+use iced::Application;
 
 fn setup_tracing() {
     use tracing_subscriber::{filter, prelude::*};
 
     let filter_modules = filter::filter_fn(|metadata| {
         if let Some(module) = metadata.module_path() {
-            !module.contains("tarp")
+            !module.contains("tarp") 
+            && !module.contains("wgpu")
+            && !module.contains("naga")
+            && !module.contains("gfx_backend")
+            && !module.contains("winit::platform_impl")
         } else {
             true
         }
@@ -31,7 +31,6 @@ fn setup_tracing() {
 pub async fn test_server(port: u16) {
     use server::db::user::UserDb;
 
-    setup_tracing();
     let db = server::db::test_db();
     let sessions = server::Sessions::new();
     let mut userdb = UserDb::open(db);
@@ -48,13 +47,16 @@ pub async fn test_server(port: u16) {
     server.await
 }
 
-pub async fn test_conn(port: u16) -> protocol::WorldClient {
-    loop {
-        sleep(Duration::from_millis(50)).await;
-        match client::connect("127.0.0.1", port).await {
-            Ok(client) => break client,
-            Err(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => continue,
-            Err(e) => panic!("could not connect to server: {:?}", e),
-        }
-    }
+fn main() {
+    setup_tracing();
+
+    thread::spawn(||{
+        use tokio::runtime::Runtime;
+        let rt  = Runtime::new().unwrap();
+        rt.block_on(async {
+            test_server(8080).await;
+        });
+    });
+
+    gui::State::run(iced::Settings::default()).unwrap()
 }
