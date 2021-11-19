@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
 use crate::gui::style;
+use crate::gui::parts::ErrorBar;
 pub use crate::Event as Msg;
 use iced::widget::Column;
 use iced::{button, text_input, Button, Checkbox, Command, Length, Row, Space, TextInput};
 use iced::{Align, Element, HorizontalAlignment, Text};
+
+use super::parts::ClearError;
 
 mod tasks;
 
@@ -39,6 +42,13 @@ pub enum Event {
     Submit,
     Error(Error),
     ClearError(Error),
+}
+
+impl ClearError for Event {
+    type Error = Error;
+    fn clear(e: Error) -> Self {
+        Self::ClearError(e)
+    }
 }
 
 #[derive(Default)]
@@ -85,38 +95,11 @@ impl Inputs {
     }
 }
 
-#[derive(Default)]
-struct ErrorBar(HashMap<Error, button::State>);
-
-impl ErrorBar {
-    pub fn add(&mut self, err: Error) {
-        self.0.insert(err, button::State::new());
-    }
-    pub fn clear(&mut self, err: Error) {
-        self.0.remove(&err);
-    }
-    pub fn view(&mut self) -> Element<Event> {
-        let mut column = Column::new();
-        for (err, button_state) in self.0.iter_mut() {
-            let button =
-                Button::new(button_state, Text::new('x')).on_press(Event::ClearError(err.clone()));
-            let text = Text::new(err.to_string()).horizontal_alignment(HorizontalAlignment::Left);
-            column = column.push(
-                Row::new()
-                    .width(Length::Fill)
-                    .align_items(Align::Center)
-                    .push(button)
-                    .push(text),
-            );
-        }
-        column.into()
-    }
-}
 
 #[derive(Default)]
 pub struct Page {
     inputs: Inputs,
-    errorbar: ErrorBar,
+    errorbar: ErrorBar<Error>,
     submit: button::State,
     remember: bool,
     logging_in: bool,

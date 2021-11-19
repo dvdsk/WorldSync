@@ -1,4 +1,4 @@
-use crate::gui::style;
+use crate::gui::{RpcConn, style};
 pub use protocol::ServiceClient;
 use protocol::{Host, Uuid, tarpc};
 pub use tarpc::context;
@@ -18,19 +18,19 @@ pub async fn login(
     port: u16,
     username: String,
     password: String,
-) -> Result<(ServiceClient, Uuid, Option<Host>), Error> {
+) -> Result<(RpcConn, Option<Host>), Error> {
     let client = crate::connect(&domain, port)
         .await
         .map_err(|_| Error::NoMetaConn)?;
-    let session_id = client
+    let session = client
         .log_in(context::current(), username, password)
         .await
         .map_err(|_| Error::NoMetaConn)??;
     let host = client
-        .host(context::current(), session_id)
+        .host(context::current(), session)
         .await
         .map_err(|_| Error::NoMetaConn)??;
-    Ok((client, session_id, host))
+    Ok((RpcConn{client, session}, host))
 }
 
 impl Page {
@@ -45,7 +45,7 @@ impl Page {
                     self.inputs.password.value.clone(),
                 );
                 Command::perform(task, move |res| match res {
-                    Ok((client, uuid, host)) => Msg::LoggedIn(client, uuid, host),
+                    Ok((rpc, host)) => Msg::LoggedIn(rpc, host),
                     Err(err) => Msg::LoginPage(Event::Error(err)),
                 })
             }

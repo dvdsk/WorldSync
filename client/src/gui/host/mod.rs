@@ -1,6 +1,9 @@
-use iced::{Command, Element, Text};
+use iced::{Column, Command, Element, Length, Text};
 pub use crate::Event as Msg;
 use crate::gui::style;
+use crate::gui::parts::ClearError;
+
+use super::parts::ErrorBar;
 
 mod tasks;
 
@@ -17,10 +20,19 @@ impl From<protocol::Error> for Error {
 
 #[derive(Debug, Clone)]
 pub enum Event {
+    ClearError(Error),
+}
+
+impl ClearError for Event {
+    type Error = Error;
+    fn clear(e: Error) -> Self {
+        Self::ClearError(e)
+    }
 }
 
 #[derive(Default)]
 pub struct Page {
+    errorbar: ErrorBar<Error>,
 }
 
 impl Page {
@@ -30,11 +42,18 @@ impl Page {
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         match dbg!(event) {
+            Event::ClearError(e) => self.errorbar.clear(e),
         }
         Command::none()
     }
 
     pub fn view(&mut self) -> Element<Msg> {
-        Element::new(Text::new("unimplemented"))
+        let main_ui = Text::new("unimplemented");
+        let errorbar = self.errorbar.view().map(move |e| Msg::HostPage(e));
+        Column::new()
+            .width(Length::Fill)
+            .push(errorbar)
+            .push(main_ui)
+            .into()
     }
 }

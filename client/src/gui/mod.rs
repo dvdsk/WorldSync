@@ -1,18 +1,29 @@
 use crate::Event;
+use protocol::{ServiceClient, Uuid};
 use iced::{executor, Application, Clipboard, Command, Element};
+use tracing::info;
 
 pub mod login;
-mod host;
-mod hosting;
-mod join;
+pub mod parts;
+pub mod host;
+pub mod hosting;
+pub mod join;
 mod style;
+
+#[derive(Clone, Debug)]
+pub struct RpcConn {
+    client: ServiceClient,
+    session: Uuid,
+}
 
 pub struct State {
     login: login::Page,
     hosting: hosting::Page,
-    host: host::Page,
-    join: join::Page,
+    can_host: host::Page,
+    can_join: join::Page,
     page: Page,
+
+    rpc: Option<RpcConn>,
 }
 
 impl State {
@@ -20,9 +31,11 @@ impl State {
         Self {
             login: login::Page::new(),
             hosting: hosting::Page::new(),
-            host: host::Page::new(),
-            join: join::Page::new(),
+            can_host: host::Page::new(),
+            can_join: join::Page::new(),
             page: Page::Login,
+
+            rpc: None
         }
     }
 }
@@ -55,11 +68,15 @@ impl Application for State {
         use Event::*;
         match message {
             LoginPage(event) => return self.login.update(event),
-            LoggedIn(client, uuid, Some(host)) => {
-                eprintln!("logged in, someone is hosting");
+            HostPage(event) => return self.can_host.update(event),
+            LoggedIn(rpc, Some(host)) => {
+                info!("logged in, can join {:?}", host);
+                self.rpc = Some(rpc);
+                self.page = Page::Join;
             }
-            LoggedIn(client, uuid, None) => {
-                eprintln!("logged_in");
+            LoggedIn(rpc, None) => {
+                info!("logged in, no one is hosting");
+                self.rpc = Some(rpc);
                 self.page = Page::Host;
             }
             Error => eprintln!("tmp error remove when error handling in place"),
@@ -70,8 +87,8 @@ impl Application for State {
     fn view(&mut self) -> Element<Event> {
         match self.page {
             Page::Login => self.login.view(),
-            Page::Join => self.join.view(),
-            Page::Host => self.host.view(),
+            Page::Join => self.can_join.view(),
+            Page::Host => self.can_host.view(),
             Page::Hosting => self.hosting.view(),
         }
     }
