@@ -1,6 +1,6 @@
 use protocol::{Error, SessionId, User};
+use protocol::tarpc::context;
 
-use client::context;
 use protocol::Uuid;
 
 mod util;

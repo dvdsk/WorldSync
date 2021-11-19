@@ -1,6 +1,6 @@
 use protocol::User;
 
-use client::context;
+use protocol::tarpc::context;
 
 mod util;
 use util::{free_port, test_conn, test_server};

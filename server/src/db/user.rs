@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::time::Duration;
 
 use protocol::{User, UserId};
@@ -54,8 +55,29 @@ impl From<Error> for protocol::Error {
 type DbResult<T> = core::result::Result<T, Error>;
 
 #[derive(Clone)]
+struct Index(Arc<RwLock<HashMap<String, UserId>>>);
+
+impl Index {
+    fn from(map: HashMap<String, UserId>) -> Self {
+        Self(Arc::new(RwLock::new(map)))
+    }
+    fn get(&self, username: &str) -> Option<UserId> {
+        self.0.read().unwrap().get(username).copied()
+    }
+    fn insert(&self, username: String, id: UserId) {
+        self.0.write().unwrap().insert(username, id);
+    }
+    fn contains(&self, username: &str) -> bool {
+        self.0.read().unwrap().contains_key(username)
+    }
+    fn remove(&self, username: &str) {
+        self.0.write().unwrap().remove(username);
+    }
+}
+
+#[derive(Clone)]
 pub struct UserDb {
-    index: HashMap<String, UserId>,
+    index: Index,
     tree: Tree<UserId, UserEntry>,
     db: sled::Db,
 }
@@ -63,7 +85,7 @@ pub struct UserDb {
 impl UserDb {
     pub fn from(db: sled::Db) -> Self {
         let tree = Tree::init(&db, "userdb");
-        let index = tree
+        let map = tree
             .iter()
             .values()
             .map(|e: Result<UserEntry, _>| {
@@ -75,7 +97,11 @@ impl UserDb {
             })
             .map(|e| (e.user.username, e.id))
             .collect();
-        UserDb { index, tree, db }
+        UserDb {
+            index: Index::from(map),
+            tree,
+            db,
+        }
     }
 
     fn get_entry(&self, user_id: UserId) -> DbResult<Option<UserEntry>> {
@@ -87,7 +113,7 @@ impl UserDb {
     }
 
     pub fn get_user_id(&self, username: &str) -> Option<UserId> {
-        self.index.get(username).copied()
+        self.index.get(username)
     }
 
     pub fn get_userlist(&self) -> DbResult<Vec<(UserId, User)>> {
@@ -225,6 +251,10 @@ impl UserDb {
     }
 
     pub async fn add_user(&mut self, user: User, password: impl Into<String>) -> DbResult<()> {
+        if self.index.contains(&user.username) {
+            return Err(Error::AlreadyExists);
+        }
+
         let id = self.db.generate_id()?;
         let passhash = encode_pass(password.into()).await;
         let entry = UserEntry {
@@ -232,6 +262,7 @@ impl UserDb {
             user: user.clone(),
             passhash,
         };
+
         self.add_unique_entry(entry).await?;
         self.tree.flush_async().await?;
         self.index.insert(user.username, id);

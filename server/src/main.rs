@@ -20,12 +20,12 @@ async fn main() {
         return 
     }
 
-    let subscriber = tracing_subscriber::fmt()
+    let _subscriber = tracing_subscriber::fmt()
         .finish();
 
     let db = sled::open("db").unwrap();
     let sessions = Sessions::new();
-    let user_db = UserDb::from(db);
+    let user_db = UserDb::from(db.clone());
     let world = World::from(db);
     server::host(sessions, user_db, world, opt.port).await;
 }
