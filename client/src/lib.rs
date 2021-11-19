@@ -1,5 +1,5 @@
 use protocol::tarpc;
-pub use protocol::WorldClient;
+pub use protocol::ServiceClient;
 use tarpc::client::Config;
 pub use tarpc::context;
 use tarpc::tokio_serde::formats::Json;
@@ -40,9 +40,9 @@ async fn connect_tcp(_domain: &str, port: u16) -> Result<TcpStream, std::io::Err
     TcpStream::connect(format!("127.0.0.1:{}", port)).await
 }
 
-pub async fn connect(domain: &str, port: u16) -> Result<WorldClient, std::io::Error> {
+pub async fn connect(domain: &str, port: u16) -> Result<ServiceClient, std::io::Error> {
     let stream = connect_tcp(domain, port).await?;
     let transport = tarpc::serde_transport::Transport::from((stream, Json::default()));
-    let client = WorldClient::new(Config::default(), transport).spawn();
+    let client = ServiceClient::new(Config::default(), transport).spawn();
     Ok(client)
 }

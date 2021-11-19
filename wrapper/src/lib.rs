@@ -105,17 +105,8 @@ async fn handle_stdout(line: String) -> bool {
 }
 
 async fn handle_stderr(line: String) -> bool {
-    dbg!(line);
+    // dbg!(line);
     false
 }
 
 pub struct Handle(ChildStdin);
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}

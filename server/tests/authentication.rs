@@ -55,7 +55,7 @@ async fn correct_user_wrong_pass() {
     assert!(result.is_err());
 }
 
-async fn log_in_and_change_pass(client: &protocol::WorldClient) -> SessionId {
+async fn log_in_and_change_pass(client: &protocol::ServiceClient) -> SessionId {
     let session_id = client
         .log_in(
             context::current(),

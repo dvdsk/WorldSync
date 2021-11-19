@@ -33,18 +33,16 @@ pub async fn test_server(port: u16) {
 
     let db = server::db::test_db();
     let sessions = server::Sessions::new();
-    let mut userdb = UserDb::open(db);
+    let world = server::World::from(db.clone());
+    let mut userdb = UserDb::from(db);
 
     use protocol::User;
-    for i in 0..10 {
-        userdb
-            .add_user(User::test_user(i), User::test_password(i))
-            .await
-            .expect("could not add test users");
-    }
+    userdb
+        .add_user(User::test_user(0), User::test_password(0))
+        .await
+        .expect("could not add test users");
 
-    let server = server::host(sessions, userdb, port);
-    server.await
+    let server = server::host(sessions, userdb, world, port).await;
 }
 
 fn main() {

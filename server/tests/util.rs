@@ -48,7 +48,7 @@ pub async fn test_server(port: u16) {
     server.await
 }
 
-pub async fn test_conn(port: u16) -> protocol::WorldClient {
+pub async fn test_conn(port: u16) -> protocol::ServiceClient {
     loop {
         sleep(Duration::from_millis(50)).await;
         match client::connect("127.0.0.1", port).await {

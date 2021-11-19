@@ -1,18 +1,21 @@
 use futures::future;
 use futures::StreamExt;
+use tracing::info;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Instant;
 
-use protocol::{tarpc, World, UserId};
+use protocol::{tarpc, Service, UserId};
 use tarpc::server::{incoming::Incoming, Channel};
 use tarpc::tokio_serde::formats::Json;
 use uuid::Uuid;
 
 pub mod admin_ui;
 pub mod db;
+mod world;
+pub use world::World;
 use db::user::UserDb;
 mod rpc;
 use rpc::ConnState;
@@ -45,10 +48,10 @@ pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-
-pub async fn host(sessions: Sessions, userdb: UserDb, port: u16) {
+pub async fn host(sessions: Sessions, userdb: UserDb, world: World, port: u16) {
     let server_addr = (IpAddr::V4(Ipv4Addr::LOCALHOST), port);
 
+    info!("starting listener on port {}", port);
     // JSON transport is provided by the json_transport tarpc module. It makes it easy
     // to start up a serde-powered json serialization strategy over TCP.
     let mut listener = tarpc::serde_transport::tcp::listen(&server_addr, Json::default)
@@ -69,6 +72,7 @@ pub async fn host(sessions: Sessions, userdb: UserDb, port: u16) {
                 peer_addr,
                 sessions: sessions.clone(),
                 userdb: userdb.clone(),
+                world: world.clone(),
             };
             channel.execute(server.serve())
         })

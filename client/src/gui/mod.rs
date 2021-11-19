@@ -55,8 +55,12 @@ impl Application for State {
         use Event::*;
         match message {
             LoginPage(event) => return self.login.update(event),
-            LoggedIn(client, uuid) => {
+            LoggedIn(client, uuid, Some(host)) => {
+                eprintln!("logged in, someone is hosting");
+            }
+            LoggedIn(client, uuid, None) => {
                 eprintln!("logged_in");
+                self.page = Page::Host;
             }
             Error => eprintln!("tmp error remove when error handling in place"),
         }

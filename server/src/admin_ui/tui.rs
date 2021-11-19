@@ -1,7 +1,7 @@
 use protocol::{tarpc, User, UserId};
 use tarpc::context;
 
-use super::WorldClient;
+use super::ServiceClient;
 use dialoguer::{Confirm, Input, Password, Select};
 
 #[derive(thiserror::Error, Debug)]
@@ -15,10 +15,10 @@ pub enum Error {
 }
 
 pub struct Tui {
-    pub client: WorldClient,
+    pub client: ServiceClient,
 }
 
-pub async fn main_menu(client: WorldClient) {
+pub async fn main_menu(client: ServiceClient) {
     let mut ui = Tui { client };
     loop {
         let selection = Select::new()

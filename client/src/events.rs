@@ -1,9 +1,9 @@
 use crate::gui::login;
-use protocol::{Uuid, WorldClient};
+use protocol::{Host, ServiceClient, Uuid};
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    LoggedIn(WorldClient, Uuid),
+    LoggedIn(ServiceClient, Uuid, Option<Host>),
     LoginPage(login::Event),
     Error,
 }

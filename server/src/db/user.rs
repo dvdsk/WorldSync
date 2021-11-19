@@ -61,7 +61,7 @@ pub struct UserDb {
 }
 
 impl UserDb {
-    pub fn open(db: sled::Db) -> Self {
+    pub fn from(db: sled::Db) -> Self {
         let tree = Tree::init(&db, "userdb");
         let index = tree
             .iter()
@@ -260,7 +260,7 @@ mod tests {
     #[tokio::test]
     async fn test_store_w_existing_user() {
         let db = super::super::test_db();
-        let mut userdb = UserDb::open(db);
+        let mut userdb = UserDb::from(db);
         let testuser = User {
             username: "test".to_owned(),
         };

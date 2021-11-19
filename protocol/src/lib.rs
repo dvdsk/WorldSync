@@ -1,3 +1,6 @@
+use std::net::SocketAddr;
+use std::time::Instant;
+
 use serde::{Deserialize, Serialize};
 pub use tarpc;
 pub use uuid::Uuid;
@@ -24,6 +27,11 @@ pub enum Error {
 
 pub type UserId = u64;
 pub type SessionId = Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Host {
+    pub addr: SocketAddr,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct User {
@@ -57,13 +65,14 @@ pub fn version() -> &'static str {
 /// This is the service definition. It looks a lot like a trait definition.
 /// It defines one RPC, hello, which takes one arg, name, and returns a String.
 #[tarpc::service]
-pub trait World {
+pub trait Service {
     async fn version() -> Version;
     async fn log_in(username: String, password: String) -> Result<SessionId, Error>;
     async fn get_account(id: SessionId) -> Result<User, Error>;
     async fn update_account(id: SessionId, new: User) -> Result<(), Error>;
     async fn update_password(id: SessionId, new: String) -> Result<(), Error>;
     async fn close_account(id: SessionId) -> Result<(), Error>;
+    async fn host(id: SessionId) -> Result<Option<Host>, Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
     async fn list_users() -> Result<Vec<(UserId, User)>, Error>;

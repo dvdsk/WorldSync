@@ -1,33 +1,11 @@
-use crate::db::user::UserDb;
-use crate::Sessions;
 use protocol::Error;
-use protocol::{tarpc, SessionId, User, UserId, World};
-use std::net::SocketAddr;
+use protocol::{tarpc, SessionId, User, UserId, Service};
 use tarpc::context;
 use tracing::{info, warn};
-
-#[derive(Clone)]
-pub struct ConnState {
-    pub peer_addr: SocketAddr,
-    pub sessions: Sessions,
-    pub userdb: UserDb,
-}
-
-impl ConnState {
-    pub fn get_user_id(&self, id: SessionId) -> Option<UserId> {
-        self.sessions.0.read().unwrap().get(&id).map(|s| s.user_id)
-    }
-    pub fn clear_sessions(&self, id: UserId) {
-        self.sessions
-            .0
-            .write()
-            .unwrap()
-            .retain(|_, v| v.user_id != id)
-    }
-}
+use super::ConnState;
 
 #[tarpc::server]
-impl World for ConnState {
+impl Service for ConnState {
     async fn version(self, _: context::Context) -> protocol::Version {
         protocol::Version {
             protocol: protocol::version().to_owned(),
@@ -102,6 +80,11 @@ impl World for ConnState {
         Ok(())
     }
 
+    async fn host(mut self, _: context::Context, id: SessionId) -> Result<Option<protocol::Host>, Error> {
+        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        Ok(self.world.host())
+    }
+
     async fn add_user(
         mut self,
         _: context::Context,
@@ -164,4 +147,5 @@ impl World for ConnState {
         info!("removed user: {}", name);
         Ok(())
     }
+
 }
