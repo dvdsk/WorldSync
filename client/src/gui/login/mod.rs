@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::gui::style;
 use crate::gui::parts::ErrorBar;
 pub use crate::Event as Msg;

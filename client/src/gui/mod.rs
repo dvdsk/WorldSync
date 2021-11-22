@@ -1,19 +1,20 @@
-use crate::Event;
+use crate::{events, Event};
+use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{ServiceClient, Uuid};
-use iced::{executor, Application, Clipboard, Command, Element};
 use tracing::info;
 
-pub mod login;
-pub mod parts;
 pub mod host;
 pub mod hosting;
 pub mod join;
+pub mod login;
+pub mod parts;
 mod style;
+mod tasks;
 
 #[derive(Clone, Debug)]
 pub struct RpcConn {
-    client: ServiceClient,
-    session: Uuid,
+    pub client: ServiceClient,
+    pub session: Uuid,
 }
 
 pub struct State {
@@ -23,6 +24,7 @@ pub struct State {
     can_join: join::Page,
     page: Page,
 
+    server_events: Option<events::ServerSub>,
     rpc: Option<RpcConn>,
 }
 
@@ -35,7 +37,8 @@ impl State {
             can_join: join::Page::new(),
             page: Page::Login,
 
-            rpc: None
+            server_events: None,
+            rpc: None,
         }
     }
 }
@@ -65,23 +68,33 @@ impl Application for State {
         message: Self::Message,
         _clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
-        use Event::*;
         match message {
-            LoginPage(event) => return self.login.update(event),
-            HostPage(event) => return self.can_host.update(event),
-            LoggedIn(rpc, Some(host)) => {
+            Event::LoginPage(event) => return self.login.update(event),
+            Event::HostPage(event) => return self.can_host.update(event, &mut self.rpc),
+            Event::LoggedIn(rpc, Some(host)) => {
                 info!("logged in, can join {:?}", host);
                 self.rpc = Some(rpc);
                 self.page = Page::Join;
+                // TODO add updater
             }
-            LoggedIn(rpc, None) => {
+            Event::LoggedIn(rpc, Option::None) => {
                 info!("logged in, no one is hosting");
                 self.rpc = Some(rpc);
                 self.page = Page::Host;
+                // TODO add updater
             }
-            Error => eprintln!("tmp error remove when error handling in place"),
+
+            Event::Error(e) => panic!("tmp error remove {:?}", e),
+            _e => todo!("handle: {:?}", _e),
         }
         Command::none()
+    }
+
+    fn subscription(&self) -> Subscription<Event> {
+        match &self.rpc {
+            None => Subscription::none(),
+            Some(rpc) => events::sub_to_server(rpc.clone()),
+        }
     }
 
     fn view(&mut self) -> Element<Event> {

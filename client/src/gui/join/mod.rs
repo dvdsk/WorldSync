@@ -1,6 +1,5 @@
 use iced::{Command, Element, Text};
 pub use crate::Event as Msg;
-use crate::gui::style;
 
 mod tasks;
 

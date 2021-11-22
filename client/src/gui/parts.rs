@@ -1,4 +1,3 @@
-use core::fmt;
 use core::hash::Hash;
 use std::collections::HashMap;
 use std::fmt::Display;
