@@ -9,7 +9,6 @@ pub enum Error {
 
 impl From<protocol::Error> for Error {
     fn from(e: protocol::Error) -> Self {
-        todo!();
         unimplemented!("should not run into {:?} on login page", e)
     }
 }

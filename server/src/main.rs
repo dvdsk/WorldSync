@@ -1,4 +1,5 @@
-use server::{Sessions, World, db::user::UserDb};
+use server::Sessions;
+use server::{World, db::user::UserDb};
 use typed_sled::sled;
 use structopt::StructOpt;
 mod admin_ui;

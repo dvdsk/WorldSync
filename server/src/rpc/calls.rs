@@ -1,8 +1,9 @@
-use protocol::Error;
-use protocol::{tarpc, SessionId, User, UserId, Service};
-use tarpc::context;
-use tracing::{info, warn};
 use super::ConnState;
+use protocol::{tarpc, Service, SessionId, User, UserId};
+use protocol::{Error, Event};
+use tarpc::context;
+use tokio::sync::broadcast::error::RecvError;
+use tracing::{info, warn};
 
 #[tarpc::server]
 impl Service for ConnState {
@@ -25,7 +26,7 @@ impl Service for ConnState {
             .ok_or(Error::IncorrectLogin)?;
         match self.userdb.validate_credentials(user_id, password).await {
             Ok(user_id) => {
-                let uuid = self.sessions.add(user_id);
+                let uuid = self.add_session(user_id);
                 Ok(uuid)
             }
             Err(DbError::IncorrectPass) => {
@@ -68,7 +69,7 @@ impl Service for ConnState {
     ) -> Result<(), Error> {
         let user_id = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         self.userdb.change_password(user_id, new).await?;
-        self.clear_sessions(user_id);
+        self.clear_user_sessions(user_id);
         info!("user ({}) changed password", user_id);
         Ok(())
     }
@@ -80,9 +81,33 @@ impl Service for ConnState {
         Ok(())
     }
 
-    async fn host(mut self, _: context::Context, id: SessionId) -> Result<Option<protocol::Host>, Error> {
+    async fn host(
+        self,
+        _: context::Context,
+        id: SessionId,
+    ) -> Result<Option<protocol::Host>, Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         Ok(self.world.host())
+    }
+
+    async fn request_to_host(self, _: context::Context, id: SessionId) -> Result<bool, Error> {
+        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        Ok(self.world.set_host(self.peer_addr))
+    }
+    async fn await_event(self, _: context::Context, id: SessionId) -> Result<Event, Error> {
+        let backlog = {
+            let sessions = self.sessions.by_id.read().unwrap();
+            let session = sessions.get(&id).ok_or(Error::SessionExpired)?;
+            session.backlog.clone()
+        };
+
+        let mut backlog = backlog.try_lock_owned().map_err(|_| Error::BackLogLocked)?;
+
+        match backlog.recv().await {
+            Err(RecvError::Closed) => panic!("events queue got closed"),
+            Err(RecvError::Lagged(_)) => Err(Error::Lagging),
+            Ok(event) => Ok(event),
+        }
     }
 
     async fn add_user(
@@ -132,7 +157,7 @@ impl Service for ConnState {
         }
 
         self.userdb.change_password(user_id, new_password).await?;
-        self.clear_sessions(user_id);
+        self.clear_user_sessions(user_id);
         if let Ok(Some(user)) = self.userdb.get_user(user_id) {
             info!("overrode password for user: {}", user.username);
         }
@@ -147,5 +172,4 @@ impl Service for ConnState {
         info!("removed user: {}", name);
         Ok(())
     }
-
 }

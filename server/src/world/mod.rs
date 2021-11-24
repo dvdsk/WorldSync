@@ -17,6 +17,11 @@ impl World {
         let state = self.state.read().unwrap();
         state.host()
     }
+    pub fn set_host(&self, addr: SocketAddr) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.set_host(addr)
+    }
+
     pub fn from(db: sled::Db) -> Self {
         Self {
             state: Arc::new(RwLock::new(State { host: None })),
@@ -38,5 +43,17 @@ pub struct State {
 impl State {
     pub fn host(&self) -> Option<protocol::Host> {
         self.host.as_ref().map(|h| protocol::Host { addr: h.addr })
+    }
+    pub fn set_host(&mut self, addr: SocketAddr) -> bool {
+        if self.host.is_some() {
+            return false;
+        }
+
+        self.host = Some(Host {
+            last_hb: Instant::now(),
+            addr,
+        });
+
+        true
     }
 }

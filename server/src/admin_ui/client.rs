@@ -38,7 +38,7 @@ impl Tui {
             .expect("rpc failure")
         {
             Ok(_) => (),
-            Err(protocol::Error::UserChanged(curr_user)) => println!("failed: user was removed"),
+            Err(protocol::Error::UserRemoved) => println!("failed: user was removed"),
             Err(e) => panic!("unexpected error: {}", e),
         }
     }

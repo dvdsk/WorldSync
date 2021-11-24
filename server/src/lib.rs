@@ -1,11 +1,13 @@
 use futures::future;
 use futures::StreamExt;
-use tracing::info;
+use protocol::Event;
+use tokio::sync::broadcast;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use std::sync::RwLock;
-use std::time::Instant;
+use tracing::info;
 
 use protocol::{tarpc, Service, UserId};
 use tarpc::server::{incoming::Incoming, Channel};
@@ -15,37 +17,64 @@ use uuid::Uuid;
 pub mod admin_ui;
 pub mod db;
 mod world;
-pub use world::World;
 use db::user::UserDb;
+pub use world::World;
 mod rpc;
 use rpc::ConnState;
 
 type SessionId = Uuid;
 pub struct Session {
     user_id: UserId,
-    last_active: Instant,
+    backlog: Arc<Mutex<broadcast::Receiver<Event>>>,
 }
 
 #[derive(Clone)]
-pub struct Sessions(Arc<RwLock<HashMap<SessionId, Session>>>);
+pub struct Sessions {
+    by_id: Arc<RwLock<HashMap<SessionId, Session>>>,
+}
+        //let (event_tx, _) = broadcast::channel(100);
 impl Sessions {
     pub fn new() -> Self {
-        Self(Arc::new(RwLock::new(HashMap::new())))
+        Self {
+            by_id: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
-    fn add(&mut self, user_id: UserId) -> SessionId {
+    fn add(&mut self, user_id: UserId, backlog: broadcast::Receiver<Event>) -> SessionId {
         let uuid = Uuid::new_v4();
-        let mut sessions = self.0.write().unwrap();
+        let mut sessions = self.by_id.write().unwrap();
         let session = Session {
             user_id,
-            last_active: Instant::now(),
+            backlog: Arc::new(Mutex::new(backlog)),
         };
         sessions.insert(uuid, session);
         uuid
+    }
+    pub fn get_user_id(&self, id: SessionId) -> Option<UserId> {
+        self.by_id.read().unwrap().get(&id).map(|s| s.user_id)
+    }
+    pub fn clear_user(&self, id: UserId) {
+        self.by_id
+            .write()
+            .unwrap()
+            .retain(|_, v| v.user_id != id)
     }
 }
 
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
+}
+
+#[cfg(not(feature = "deployed"))]
+pub async fn send_test_hb(event_sender: broadcast::Sender<Event>) {
+    use std::time::Duration;
+    use tokio::time;
+
+    let mut number = 0;
+    loop {
+        event_sender.send(Event::TestHB(number)).unwrap();
+        time::sleep(Duration::from_secs(5)).await;
+        number += 1;
+    }
 }
 
 pub async fn host(sessions: Sessions, userdb: UserDb, world: World, port: u16) {
@@ -70,6 +99,7 @@ pub async fn host(sessions: Sessions, userdb: UserDb, world: World, port: u16) {
             let peer_addr = channel.transport().peer_addr().unwrap();
             let server = ConnState {
                 peer_addr,
+                events: broadcast::channel(50).0,
                 sessions: sessions.clone(),
                 userdb: userdb.clone(),
                 world: world.clone(),

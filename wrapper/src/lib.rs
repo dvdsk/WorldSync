@@ -1,3 +1,4 @@
+use std::io;
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
@@ -6,12 +7,12 @@ use tokio::process::{Child, ChildStdin, Command};
 
 pub mod parser;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum Error {
     #[error("Could not start server process")]
-    SpawnFailed(std::io::Error),
+    SpawnFailed(io::ErrorKind),
     #[error("Io error communicating with process")]
-    Pipe(std::io::Error),
+    Pipe(io::ErrorKind),
     #[error(
         "Server path does not exist or non-final
         component in path is not a directory"
@@ -54,7 +55,7 @@ impl Instance {
             .args(["-jar", "server.jar", "nogui"])
             .kill_on_drop(true)
             .spawn()
-            .map_err(Error::SpawnFailed)?;
+            .map_err(|e| Error::SpawnFailed(e.kind()))?;
 
         let stdin = wait_for(&mut child.stdin).await;
         let handle = Handle(stdin);
@@ -69,14 +70,14 @@ impl Instance {
             let stop = tokio::select! {
                 res = stdout.next_line() => {
                     match res {
-                        Err(e) => return Err(Error::Pipe(e)),
+                        Err(e) => return Err(Error::Pipe(e.kind())),
                         Ok(Some(line)) => handle_stdout(line).await,
                         Ok(None) => false,
                     }
                 }
                 res = stderr.next_line() => {
                     match res {
-                        Err(e) => return Err(Error::Pipe(e)),
+                        Err(e) => return Err(Error::Pipe(e.kind())),
                         Ok(Some(line)) => handle_stderr(line).await,
                         Ok(None) => false,
                     }

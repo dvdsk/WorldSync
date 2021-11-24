@@ -13,8 +13,8 @@ pub enum Error {
 impl From<protocol::Error> for Error {
     fn from(err: protocol::Error) -> Self {
         match err {
-            Internal => Self::Internal,
-            SessionExpired => Self::SessionExpired,
+            protocol::Error::Internal => Self::Internal,
+            protocol::Error::SessionExpired => Self::SessionExpired,
             _ => panic!("unexpected server error: {:?}", err),
         }
     }

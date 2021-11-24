@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
-use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
+pub use time;
 pub use tarpc;
 pub use uuid::Uuid;
 
@@ -23,6 +23,17 @@ pub enum Error {
     Unauthorized,
     #[error("session expired or did not exist")]
     SessionExpired,
+    #[error("missed to many server events, need to log in again")]
+    Lagging,
+    #[error("a sessions backlog should not be accessed concurrently")]
+    BackLogLocked
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Event {
+    HostLoading(u8),
+    #[cfg(not(feature = "deployed"))]
+    TestHB(usize),
 }
 
 pub type UserId = u64;
@@ -73,6 +84,8 @@ pub trait Service {
     async fn update_password(id: SessionId, new: String) -> Result<(), Error>;
     async fn close_account(id: SessionId) -> Result<(), Error>;
     async fn host(id: SessionId) -> Result<Option<Host>, Error>;
+    async fn request_to_host(id: SessionId) -> Result<bool, Error>;
+    async fn await_event(id: SessionId) -> Result<Event, Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
     async fn list_users() -> Result<Vec<(UserId, User)>, Error>;

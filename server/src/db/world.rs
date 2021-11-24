@@ -1,4 +1,4 @@
-use typed_sled::{Tree, sled};
+use typed_sled::sled;
 
 #[derive(Clone)]
 pub struct WorldDb {
