@@ -25,8 +25,9 @@ async fn main() {
         .finish();
 
     let db = sled::open("db").unwrap();
-    let sessions = Sessions::new();
+    let sessions = Sessions::default();
     let user_db = UserDb::from(db.clone());
     let world = World::from(db);
-    server::host(sessions, user_db, world, opt.port).await;
+    let events = server::events_channel();
+    server::host(sessions, user_db, world, opt.port, events).await;
 }

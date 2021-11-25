@@ -92,7 +92,7 @@ impl Tui {
             println!("username: {}", new_user.username);
             println!(
                 "password: {}",
-                password.clone().unwrap_or("[unchanged]".to_owned())
+                password.clone().unwrap_or_else(|| "[unchanged]".to_owned())
             );
 
             let selection = Select::new()

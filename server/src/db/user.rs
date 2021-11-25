@@ -186,13 +186,13 @@ impl UserDb {
 
             let new_hash = match res {
                 Ok(_) => break,
-                Err(CompareAndSwapError { current: None, .. }) => Err(Error::UserRemoved)?,
+                Err(CompareAndSwapError { current: None, .. }) => return Err(Error::UserRemoved),
                 Err(CompareAndSwapError {
                     current: Some(curr),
                     ..
                 }) => {
                     if curr.user != expected.user {
-                        Err(Error::Changed(curr))?
+                        return Err(Error::Changed(curr))
                     } else {
                         curr.passhash
                     }

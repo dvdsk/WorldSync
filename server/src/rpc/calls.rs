@@ -40,7 +40,7 @@ impl Service for ConnState {
                 warn!("Incorrect username ({}) from {}", username, self.peer_addr);
                 Err(Error::IncorrectLogin)
             }
-            Err(e) => Err(e)?,
+            Err(e) => Err(e.into()),
         }
     }
 

@@ -1,12 +1,12 @@
 use futures::future;
 use futures::StreamExt;
 use protocol::Event;
-use tokio::sync::broadcast;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use std::sync::RwLock;
+use tokio::sync::broadcast;
+use tokio::sync::Mutex;
 use tracing::info;
 
 use protocol::{tarpc, Service, UserId};
@@ -28,17 +28,12 @@ pub struct Session {
     backlog: Arc<Mutex<broadcast::Receiver<Event>>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Sessions {
     by_id: Arc<RwLock<HashMap<SessionId, Session>>>,
 }
-        //let (event_tx, _) = broadcast::channel(100);
+//let (event_tx, _) = broadcast::channel(100);
 impl Sessions {
-    pub fn new() -> Self {
-        Self {
-            by_id: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
     fn add(&mut self, user_id: UserId, backlog: broadcast::Receiver<Event>) -> SessionId {
         let uuid = Uuid::new_v4();
         let mut sessions = self.by_id.write().unwrap();
@@ -53,10 +48,7 @@ impl Sessions {
         self.by_id.read().unwrap().get(&id).map(|s| s.user_id)
     }
     pub fn clear_user(&self, id: UserId) {
-        self.by_id
-            .write()
-            .unwrap()
-            .retain(|_, v| v.user_id != id)
+        self.by_id.write().unwrap().retain(|_, v| v.user_id != id)
     }
 }
 
@@ -77,7 +69,17 @@ pub async fn send_test_hb(event_sender: broadcast::Sender<Event>) {
     }
 }
 
-pub async fn host(sessions: Sessions, userdb: UserDb, world: World, port: u16) {
+pub fn events_channel() -> Arc<broadcast::Sender<Event>> {
+    Arc::new(broadcast::channel(50).0)
+}
+
+pub async fn host(
+    sessions: Sessions,
+    userdb: UserDb,
+    world: World,
+    port: u16,
+    events: Arc<broadcast::Sender<Event>>,
+) {
     let server_addr = (IpAddr::V4(Ipv4Addr::LOCALHOST), port);
 
     info!("starting listener on port {}", port);
@@ -99,7 +101,7 @@ pub async fn host(sessions: Sessions, userdb: UserDb, world: World, port: u16) {
             let peer_addr = channel.transport().peer_addr().unwrap();
             let server = ConnState {
                 peer_addr,
-                events: broadcast::channel(50).0,
+                events: events.clone(),
                 sessions: sessions.clone(),
                 userdb: userdb.clone(),
                 world: world.clone(),

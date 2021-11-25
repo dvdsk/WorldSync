@@ -48,7 +48,6 @@ pub async fn test_server(port: u16) {
     use server::db::user::UserDb;
 
     let db = server::db::test_db();
-    let sessions = server::Sessions::new();
     let world = server::World::from(db.clone());
     let mut userdb = UserDb::from(db);
 
@@ -60,7 +59,9 @@ pub async fn test_server(port: u16) {
         .expect("could not add test users");
     }
 
-    server::host(sessions, userdb, world, port).await;
+    let events = server::events_channel();
+    let sessions = server::Sessions::default();
+    server::host(sessions, userdb, world, port, events).await;
 }
 
 pub async fn test_conn(port: u16) -> protocol::ServiceClient {

@@ -7,7 +7,7 @@ type Done = bool;
 impl Tui {
     pub async fn override_account(&self, id: UserId, user: User, new_user: &mut User) -> Done {
         if user == *new_user {
-            true;
+            return true;
         }
 
         match self
