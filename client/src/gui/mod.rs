@@ -84,6 +84,7 @@ impl Application for State {
                 // TODO add updater
             }
 
+            Event::Server(protocol::Event::TestHB(n)) => info!("recieved hb {}", n),
             Event::Error(e) => panic!("tmp error remove {:?}", e),
             _e => todo!("handle: {:?}", _e),
         }

@@ -1,10 +1,12 @@
 use crate::gui::{host, login, RpcConn};
 use crate::Error;
 use futures::stream::{self, BoxStream};
-use protocol::tarpc::context;
-use protocol::Host;
+use protocol::tarpc::client::RpcError;
+use protocol::tarpc::context::{self, Context};
+use protocol::{tarpc, Host};
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -63,12 +65,19 @@ where
 }
 
 async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
-    let server_events = conn
-        .client
-        .await_event(context::current(), conn.session)
-        .await
-        .map_err(|_| Error::NoMetaConn)??;
-    Ok(server_events)
+    let mut context = Context::current();
+    loop {
+        context.deadline = SystemTime::now() + Duration::from_secs(60*5);
+        let res = conn.client.await_event(context, conn.session).await;
+
+        match res {
+            Ok(event) => return Ok(event?),
+            Err(RpcError::DeadlineExceeded) => {
+                continue;
+            }
+            Err(_) => return Err(Error::NoMetaConn),
+        }
+    }
 }
 
 async fn await_event(conn: &mut RpcConn) -> Event {

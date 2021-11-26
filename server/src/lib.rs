@@ -57,13 +57,13 @@ pub fn version() -> &'static str {
 }
 
 #[cfg(not(feature = "deployed"))]
-pub async fn send_test_hb(event_sender: broadcast::Sender<Event>) {
+pub async fn send_test_hb(event_sender: Arc<broadcast::Sender<Event>>) {
     use std::time::Duration;
     use tokio::time;
 
     let mut number = 0;
     loop {
-        event_sender.send(Event::TestHB(number)).unwrap();
+        let _ignore_error = event_sender.send(Event::TestHB(number));
         time::sleep(Duration::from_secs(5)).await;
         number += 1;
     }

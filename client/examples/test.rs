@@ -32,7 +32,6 @@ pub async fn test_server(port: u16) {
     use server::db::user::UserDb;
 
     let db = server::db::test_db();
-    let sessions = server::Sessions::new();
     let world = server::World::from(db.clone());
     let mut userdb = UserDb::from(db);
 
@@ -42,7 +41,12 @@ pub async fn test_server(port: u16) {
         .await
         .expect("could not add test users");
 
-    let server = server::host(sessions, userdb, world, port).await;
+    let events = server::events_channel();
+    let sessions = server::Sessions::default();
+
+    let send_hb = server::send_test_hb(events.clone());
+    let server = server::host(sessions, userdb, world, port, events);
+    tokio::join!(send_hb, server);
 }
 
 fn main() {
