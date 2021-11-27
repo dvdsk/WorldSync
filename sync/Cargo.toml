@@ -11,3 +11,4 @@ walkdir = "2"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "rt", "macros"] }
 futures = "0.3"
+serde = { versin = "1", features = ["derive"] }

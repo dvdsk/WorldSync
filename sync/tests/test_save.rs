@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering::Relaxed;
 
-use sync::{DirStatus, DirUpdate, FileStatus, ObjectId, ObjectStore, SyncAction, UpdateList};
+use sync::{DirContent, DirUpdate, FileStatus, ObjectId, ObjectStore, SyncAction, UpdateList};
 
 #[derive(Default)]
 pub struct Objects {
@@ -18,6 +18,8 @@ impl ObjectStore for Objects {
     }
     fn contains(&self, file: &Path, hash: u64) -> Option<ObjectId> {
         match self.map.get(file) {
+            // Note bad mock impl, can not handle multiple files with same paths
+            // but different hashes
             Some((id, stored_hash)) if *stored_hash == hash => Some(*id),
             Some(_) => None,
             None => None,
@@ -29,7 +31,7 @@ impl ObjectStore for Objects {
 fn load_and_save() {
     let store = Objects::default();
 
-    let remote_a = DirStatus(vec![
+    let remote_a = DirContent(vec![
         FileStatus {
             path: PathBuf::from("none_existing_dir/applesaus"),
             hash: 469007863229145464,
@@ -50,7 +52,7 @@ fn load_and_save() {
     let (new_save, update_list) = UpdateList::for_new_save(&store, remote_a);
     assert!(update_list.0.len() == 4);
 
-    let remote_b = DirStatus(vec![
+    let remote_b = DirContent(vec![
         FileStatus {
             path: PathBuf::from("none_existing_dir/applesaus"),
             hash: 469007863229145464,

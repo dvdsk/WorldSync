@@ -5,7 +5,9 @@ use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::task;
 use walkdir::WalkDir;
+use serde::{Serialize, Deserialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Object {
     org_path: PathBuf,
     hash: u64,
@@ -20,10 +22,11 @@ pub enum Error {
     Io(#[from] std::io::Error),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Save(Vec<Object>);
 
 impl Save {
-    pub fn needed_update(&self, remote: DirStatus) -> DirUpdate {
+    pub fn needed_update(&self, remote: DirContent) -> DirUpdate {
         use SyncAction::*;
 
         let mut update = Vec::new();
@@ -51,7 +54,7 @@ pub trait ObjectStore {
 }
 
 impl UpdateList {
-    pub fn for_new_save(store: &impl ObjectStore, remote: DirStatus) -> (Save, UpdateList) {
+    pub fn for_new_save(store: &impl ObjectStore, remote: DirContent) -> (Save, UpdateList) {
         let mut new_objects = Vec::new();
         let mut new_save = Vec::new();
         for file in remote.0 {
@@ -75,23 +78,28 @@ impl UpdateList {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SyncAction {
     Replace(PathBuf, ObjectId),
     Remove(PathBuf),
     Add(PathBuf, ObjectId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ObjectId(pub u64);
 #[derive(Debug, Clone)]
 pub struct UpdateList(pub Vec<(ObjectId, PathBuf)>);
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DirUpdate(pub Vec<SyncAction>);
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct DirStatus(pub Vec<FileStatus>);
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+/// list of actions needed to get a local directory
+/// up to date with the central server.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DirUpdate(pub Vec<SyncAction>);
+/// list of paths with hashes that a central server can compare
+/// to a known save and calculate the diffrences
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DirContent(pub Vec<FileStatus>);
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileStatus {
     pub path: PathBuf,
     pub hash: u64,
@@ -113,8 +121,8 @@ impl FileStatus {
     }
 }
 
-impl DirStatus {
-    fn build_file_list(path: PathBuf) -> Result<Vec<PathBuf>, Error> {
+impl DirContent {
+    fn build_file_list(path: impl AsRef<Path>) -> Result<Vec<PathBuf>, Error> {
         let mut paths = Vec::new();
         for res in WalkDir::new(path) {
             let entry = res?;
@@ -132,7 +140,7 @@ impl DirStatus {
             .await
             .expect("error joining dirwalker task");
 
-        DirStatus::from_file_list(paths?).await
+        DirContent::from_file_list(paths?).await
     }
 
     pub async fn from_file_list(paths: Vec<PathBuf>) -> Result<Self, Error> {
@@ -141,6 +149,6 @@ impl DirStatus {
         let results: Result<_, _> = results.into_iter().collect();
         let checks = results?;
 
-        Ok(DirStatus(checks))
+        Ok(DirContent(checks))
     }
 }

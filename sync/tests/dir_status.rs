@@ -2,7 +2,7 @@ use std::fs::{DirBuilder, File};
 use std::io::Write;
 use std::path::PathBuf;
 
-use sync::{DirStatus, FileStatus};
+use sync::{DirContent, FileStatus};
 
 #[tokio::test]
 async fn empty_dir() {
@@ -11,10 +11,10 @@ async fn empty_dir() {
         .create("test_data/empty_dir")
         .unwrap();
 
-    let dir_status = DirStatus::from_path(PathBuf::from("test_data/empty_dir"))
+    let dir_status = DirContent::from_path(PathBuf::from("test_data/empty_dir"))
         .await
         .unwrap();
-    assert_eq!(dir_status, DirStatus(Vec::new()))
+    assert_eq!(dir_status, DirContent(Vec::new()))
 }
 
 #[tokio::test]
@@ -34,11 +34,11 @@ async fn dir_with_files() {
         file.write_all(b"Hello, world!").unwrap();
     }
 
-    let dir_status = DirStatus::from_path(PathBuf::from("test_data/dir_with_files"))
+    let dir_status = DirContent::from_path(PathBuf::from("test_data/dir_with_files"))
         .await
         .unwrap();
 
-    let correct = DirStatus(vec![
+    let correct = DirContent(vec![
         FileStatus {
             path: PathBuf::from("test_data/dir_with_files/applesaus"),
             hash: 469007863229145464,
