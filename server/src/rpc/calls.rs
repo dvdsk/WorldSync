@@ -1,5 +1,8 @@
+use crate::db::world::WorldDb;
+use sync::{ObjectId, DirUpdate, DirContent};
+
 use super::ConnState;
-use protocol::{tarpc, Service, SessionId, User, UserId};
+use protocol::{tarpc, Host, Service, SessionId, User, UserId};
 use protocol::{Error, Event};
 use tarpc::context;
 use tokio::sync::broadcast::error::RecvError;
@@ -90,9 +93,17 @@ impl Service for ConnState {
         Ok(self.world.host())
     }
 
-    async fn request_to_host(self, _: context::Context, id: SessionId) -> Result<bool, Error> {
+    async fn request_to_host(self, _: context::Context, id: SessionId) -> Result<(), Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
-        Ok(self.world.set_host(self.peer_addr))
+        let host_changed = self.world.set_host(self.peer_addr);
+        if host_changed {
+            let host = Host {
+                addr: self.peer_addr,
+                id,
+            };
+            let _irrelevant = self.events.send(Event::NewHost(host));
+        }
+        Ok(())
     }
     async fn await_event(self, _: context::Context, id: SessionId) -> Result<Event, Error> {
         let backlog = {
@@ -108,6 +119,26 @@ impl Service for ConnState {
             Err(RecvError::Lagged(_)) => Err(Error::Lagging),
             Ok(event) => Ok(event),
         }
+    }
+    async fn dir_update(
+        self,
+        _: context::Context,
+        id: SessionId,
+        dir: DirContent,
+    ) -> Result<DirUpdate, Error> {
+        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        todo!();
+        // self.world.get_update(dir);
+        
+    }
+    async fn get_object(
+        self,
+        _: context::Context,
+        id: SessionId,
+        object: ObjectId,
+    ) -> Result<Vec<u8>, Error> {
+        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        Ok(WorldDb::get_object(object).await?)
     }
 
     async fn add_user(
