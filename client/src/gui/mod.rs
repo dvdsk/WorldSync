@@ -26,6 +26,7 @@ pub struct State {
 
     server_events: Option<events::ServerSub>,
     rpc: Option<RpcConn>,
+    dl_world: Option<WorldDl>,
 }
 
 impl State {
@@ -39,6 +40,7 @@ impl State {
 
             server_events: None,
             rpc: None,
+            dl_world: None,
         }
     }
 }
@@ -68,24 +70,33 @@ impl Application for State {
         message: Self::Message,
         _clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
+        use Event::*;
+        use protocol::Event::*;
+
         match message {
-            Event::LoginPage(event) => return self.login.update(event),
-            Event::HostPage(event) => return self.can_host.update(event, &mut self.rpc),
-            Event::LoggedIn(rpc, Some(host)) => {
+            LoginPage(event) => return self.login.update(event),
+            HostPage(event) => return self.can_host.update(event, &mut self.rpc),
+            LoggedIn(rpc, Some(host)) => {
                 info!("logged in, can join {:?}", host);
                 self.rpc = Some(rpc);
                 self.page = Page::Join;
                 // TODO add updater
             }
-            Event::LoggedIn(rpc, Option::None) => {
+            LoggedIn(rpc, Option::None) => {
                 info!("logged in, no one is hosting");
                 self.rpc = Some(rpc);
                 self.page = Page::Host;
                 // TODO add updater
             }
-
-            Event::Server(protocol::Event::TestHB(n)) => info!("recieved hb {}", n),
-            Event::Error(e) => panic!("tmp error remove {:?}", e),
+            Server(NewHost(host)) if self.is_us(&host) => {
+                self.dl_world = Some(WorldDl::new());
+            }
+            Server(NewHost(host)) => {
+                self.can_join.host = Some(host);
+                self.page = Page::Join;
+            }
+            Server(TestHB(n)) => info!("recieved hb {}", n),
+            Error(e) => panic!("tmp error remove {:?}", e),
             _e => todo!("handle: {:?}", _e),
         }
         Command::none()

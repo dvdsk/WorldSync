@@ -1,10 +1,11 @@
 use core::hash::Hash;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::ops::RangeInclusive;
 
 pub use crate::Event as Msg;
 use iced::widget::Column;
-use iced::{button, Button, Length, Row};
+use iced::{Button, Length, ProgressBar, Row, Space, button};
 use iced::{Align, Element, HorizontalAlignment, Text};
 
 pub trait ClearError : Clone {
@@ -42,5 +43,29 @@ impl<'a, Err: Clone + Eq + Hash + Display> ErrorBar<Err> {
             );
         }
         column.into()
+    }
+}
+
+pub enum Loading {
+    NotStarted,
+    InProgress {
+        range: RangeInclusive<f32>,
+        value: f32,
+    }
+}
+
+impl Default for Loading {
+    fn default() -> Self {
+        Loading::NotStarted
+    }
+}
+
+impl Loading {
+    pub fn view(&self) -> Element<Msg> {
+        use Loading::*;
+        match self {
+            NotStarted => Space::with_height(Length::FillPortion(1)).into(),
+            InProgress{range, value} => ProgressBar::new(range.clone(), *value).into(),
+        }
     }
 }

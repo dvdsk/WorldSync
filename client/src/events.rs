@@ -16,6 +16,7 @@ pub enum Event {
     StartHosting,
     HostAssigned,
     Server(protocol::Event),
+    WorldUpdated,
     Error(Error),
     None,
 }

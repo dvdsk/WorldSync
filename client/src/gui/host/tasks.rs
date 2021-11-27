@@ -1,17 +1,17 @@
 use crate::gui::RpcConn;
-pub use protocol::ServiceClient;
 use protocol::tarpc;
+pub use protocol::ServiceClient;
 pub use tarpc::context;
 
 use super::{Error, Event, Msg, Page};
 use iced::Command;
 
-async fn request_to_host(rpc: RpcConn) -> Result<bool, Error> {
-    let became_host = rpc.client
+async fn request_to_host(rpc: RpcConn) -> Result<(), Error> {
+    rpc.client
         .request_to_host(context::current(), rpc.session)
         .await
-        .map_err(|_| Error::NoMetaConn)??;
-    Ok(became_host)
+        .map_err(|_| Error::NoMetaConn)?
+        .map_err(|e| e.into())
 }
 
 impl Page {
@@ -23,8 +23,9 @@ impl Page {
         let task = request_to_host(rpc);
 
         Command::perform(task, move |res| match res {
-            Ok(true) => Msg::HostAssigned,
-            Ok(false) => Msg::None, // update subscription will update state soon enough
+            // if we became host we will get the msg via 
+            // the server event subscription
+            Ok(()) => Msg::None,
             Err(err) => Msg::HostPage(Event::Error(err)),
         })
     }

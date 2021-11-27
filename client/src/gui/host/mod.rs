@@ -2,10 +2,11 @@ use std::ops::RangeInclusive;
 
 use crate::gui::parts::ClearError;
 pub use crate::Event as Msg;
+use crate::world_dl;
 use iced::{Button, Column, Command, Element, HorizontalAlignment, Length, ProgressBar, Row, Space, Text, button};
 
 use super::RpcConn;
-use super::parts::ErrorBar;
+use super::parts::{ErrorBar, Loading};
 
 mod tasks;
 
@@ -13,6 +14,8 @@ mod tasks;
 pub enum Error {
     #[error("Could not connect to WorldSync server")]
     NoMetaConn,
+    #[error("Error downloading world: {0}")]
+    Sync(#[from] world_dl::Error),
 }
 
 impl From<protocol::Error> for Error {
@@ -25,7 +28,9 @@ impl From<protocol::Error> for Error {
 pub enum Event {
     Error(Error),
     ClearError(Error),
-    StartHosting,
+    WantToHost,
+    ObjToSync{left: usize},
+    DlStarting,
 }
 
 impl ClearError for Event {
@@ -52,7 +57,7 @@ impl Page {
         match dbg!(event) {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
-            Event::StartHosting => return self.request_to_host(rpc),
+            Event::WantToHost => return self.request_to_host(rpc),
         }
         Command::none()
     }
@@ -91,28 +96,4 @@ fn title() -> Text {
 fn host_button(state: &mut button::State) -> Button<Msg> {
     Button::new(state, Text::new("Login"))
         .on_press(Msg::StartHosting)
-}
-
-pub enum Loading {
-    NotStarted,
-    InProgress {
-        range: RangeInclusive<f32>,
-        value: f32,
-    }
-}
-
-impl Default for Loading {
-    fn default() -> Self {
-        Loading::NotStarted
-    }
-}
-
-impl Loading {
-    fn view(&self) -> Element<Msg> {
-        use Loading::*;
-        match self {
-            NotStarted => Space::with_height(Length::FillPortion(1)).into(),
-            InProgress{range, value} => ProgressBar::new(range.clone(), *value).into(),
-        }
-    }
 }

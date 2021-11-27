@@ -7,10 +7,12 @@ use tokio::net::TcpStream;
 
 mod error;
 mod events;
+mod world_dl;
 pub mod gui;
 pub mod mc;
 pub use error::Error;
 pub use events::Event;
+pub use world_dl::WorldDl;
 
 #[cfg(feature = "deployed")]
 use tokio_rustls::{client::TlsStream, rustls, TlsConnector};

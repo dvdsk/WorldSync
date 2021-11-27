@@ -1,5 +1,6 @@
-use iced::{Command, Element, Text};
+use iced::{Column, Command, Element, HorizontalAlignment, Length, Space, Text};
 pub use crate::Event as Msg;
+use super::parts::ErrorBar;
 
 mod tasks;
 
@@ -19,6 +20,7 @@ pub enum Event {
 
 #[derive(Default)]
 pub struct Page {
+    errorbar: ErrorBar<Error>,
 }
 
 impl Page {
@@ -33,6 +35,32 @@ impl Page {
     }
 
     pub fn view(&mut self) -> Element<Msg> {
-        Element::new(Text::new("unimplemented"))
+        let sidebar = Space::with_width(Length::FillPortion(4));
+        let left_spacer = Space::with_width(Length::FillPortion(1));
+        let top_spacer = Space::with_height(Length::FillPortion(1));
+        let center_column = Column::new()
+            .push(top_spacer)
+            .push(title())
+            .push(host_button(&mut self.host))
+            .push(self.downloading.view())
+            .push(self.loading_server.view());
+
+        let ui = Row::new()
+            .push(left_spacer)
+            .push(center_column)
+            .push(sidebar);
+
+        let errorbar = self.errorbar.view().map(move |e| Msg::HostPage(e));
+        Column::new()
+            .width(Length::Fill)
+            .push(errorbar)
+            .push(ui)
+            .into()
     }
+}
+
+fn title() -> Text {
+    Text::new("Hosting")
+        .width(Length::FillPortion(1))
+        .horizontal_alignment(HorizontalAlignment::Center)
 }

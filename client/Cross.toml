@@ -1,0 +1,9 @@
+# see: https://github.com/rust-embedded/cross/pull/540
+# https://github.com/rust-embedded/cross/pull/438/files
+# https://github.com/rust-embedded/cross/issues/388
+
+# [target.x86_64-pc-windows-gnu.env]
+# volumes = [
+# 	# "../protocol"
+#     "/home/david/Documents/mpsm/protocol",
+# ]

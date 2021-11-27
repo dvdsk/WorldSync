@@ -19,6 +19,7 @@ pub enum Event {
 
 #[derive(Default)]
 pub struct Page {
+    pub host: Option<protocol::Host>,
 }
 
 impl Page {

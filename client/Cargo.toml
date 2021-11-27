@@ -19,6 +19,7 @@ iced = { version = "0.3" , features = ["tokio"] }
 iced_futures = "0.3"
 iced_native = "0.4"
 wrapper = { path = "../wrapper" }
+sync = { path = "../sync" }
 
 [dev-dependencies]
 tracing = "0.1"
