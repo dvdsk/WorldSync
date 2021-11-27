@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use sync::{DirContent, DirUpdate, ObjectId};
 
 use serde::{Deserialize, Serialize};
 pub use time;
@@ -34,6 +35,7 @@ pub enum Event {
     HostLoading(u8),
     #[cfg(not(feature = "deployed"))]
     TestHB(usize),
+    NewHost(Host),
 }
 
 pub type UserId = u64;
@@ -42,6 +44,7 @@ pub type SessionId = Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Host {
     pub addr: SocketAddr,
+    pub id: SessionId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -83,9 +86,11 @@ pub trait Service {
     async fn update_account(id: SessionId, new: User) -> Result<(), Error>;
     async fn update_password(id: SessionId, new: String) -> Result<(), Error>;
     async fn close_account(id: SessionId) -> Result<(), Error>;
-    async fn host(id: SessionId) -> Result<Option<Host>, Error>;
-    async fn request_to_host(id: SessionId) -> Result<bool, Error>;
     async fn await_event(id: SessionId) -> Result<Event, Error>;
+    async fn host(id: SessionId) -> Result<Option<Host>, Error>;
+    async fn request_to_host(id: SessionId) -> Result<(), Error>;
+    async fn dir_update(id: SessionId, dir: DirContent) -> Result<DirUpdate, Error>;
+    async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
     async fn list_users() -> Result<Vec<(UserId, User)>, Error>;
