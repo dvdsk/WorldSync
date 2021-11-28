@@ -1,13 +1,12 @@
 use std::io;
 use std::path::{Path, PathBuf};
-use protocol::UserId;
-use sync::{ObjectId, ObjectStore, Save};
+use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save};
 use tokio::fs;
 use tracing::instrument;
 use typed_sled::{sled, Tree};
 
 #[derive(Debug, thiserror::Error)]
-enum Error {
+pub enum Error {
     #[error("Coud not read obj: {1}, ran into error: {0:?}")]
     CantReadObj(io::ErrorKind, PathBuf),
 }
@@ -15,18 +14,16 @@ enum Error {
 impl From<Error> for protocol::Error {
     fn from(e: Error) -> Self {
         match e {
-            Error::CantReadObj(_,_) => protocol::Error::Internal,
+            Error::CantReadObj(_, _) => protocol::Error::Internal,
         }
     }
 }
-
-type SaveId = (UserId, u8);
 
 #[derive(Clone)]
 pub struct WorldDb {
     db: sled::Db,
     objects: Tree<(PathBuf, u64), ObjectId>,
-    saves: Tree<SaveId, Save>,
+    saves: sled::Tree, // save by a id (saveId)
 }
 
 impl ObjectStore for WorldDb {
@@ -43,8 +40,15 @@ impl ObjectStore for WorldDb {
 impl WorldDb {
     pub fn from(db: sled::Db) -> Self {
         let objects = Tree::open(&db, "objects");
-        let saves = Tree::open(&db, "saves");
+        let saves = db.open_tree("saves").unwrap();
         WorldDb { objects, db, saves }
+    }
+
+    fn last_save(&self) -> Save {
+        match self.saves.last().unwrap() {
+            Some((_, v)) => bincode::deserialize(&v).unwrap(),
+            None => Save::new_empty(),
+        }
     }
 
     #[instrument(err)]
@@ -55,5 +59,9 @@ impl WorldDb {
         fs::read(&path)
             .await
             .map_err(|e| Error::CantReadObj(e.kind(), path))
+    }
+
+    pub fn get_update_list(&self, dir: DirContent) -> DirUpdate {
+        self.last_save().needed_update(dir)
     }
 }

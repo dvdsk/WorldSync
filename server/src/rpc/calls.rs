@@ -1,8 +1,8 @@
 use crate::db::world::WorldDb;
-use sync::{ObjectId, DirUpdate, DirContent};
+use sync::{DirContent, DirUpdate, ObjectId};
 
 use super::ConnState;
-use protocol::{tarpc, Host, Service, SessionId, User, UserId};
+use protocol::{tarpc, Host, HostId, Service, SessionId, User, UserId};
 use protocol::{Error, Event};
 use tarpc::context;
 use tokio::sync::broadcast::error::RecvError;
@@ -93,13 +93,18 @@ impl Service for ConnState {
         Ok(self.world.host())
     }
 
-    async fn request_to_host(self, _: context::Context, id: SessionId) -> Result<(), Error> {
+    async fn request_to_host(
+        self,
+        _: context::Context,
+        id: SessionId,
+        host_id: HostId,
+    ) -> Result<(), Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
-        let host_changed = self.world.set_host(self.peer_addr);
+        let host_changed = self.world.set_host(self.peer_addr, id);
         if host_changed {
             let host = Host {
                 addr: self.peer_addr,
-                id,
+                id: host_id,
             };
             let _irrelevant = self.events.send(Event::NewHost(host));
         }
@@ -127,9 +132,7 @@ impl Service for ConnState {
         dir: DirContent,
     ) -> Result<DirUpdate, Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
-        todo!();
-        // self.world.get_update(dir);
-        
+        Ok(self.world.get_update(dir))
     }
     async fn get_object(
         self,

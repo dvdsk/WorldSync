@@ -84,7 +84,7 @@ pub struct UserDb {
 
 impl UserDb {
     pub fn from(db: sled::Db) -> Self {
-        let tree = Tree::init(&db, "userdb");
+        let tree = Tree::open(&db, "userdb");
         let map = tree
             .iter()
             .values()
