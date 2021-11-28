@@ -6,6 +6,7 @@ use tokio::io::AsyncReadExt;
 use tokio::task;
 use walkdir::WalkDir;
 use serde::{Serialize, Deserialize};
+use tracing::instrument;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Object {
@@ -16,9 +17,9 @@ struct Object {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Ran into an error while walking through save dir")]
+    #[error("Ran into an error while walking through save dir: {0}")]
     Walk(#[from] walkdir::Error),
-    #[error("Could not open file in save")]
+    #[error("Could not open file in save: {0}")]
     Io(#[from] std::io::Error),
 }
 
@@ -26,6 +27,9 @@ pub enum Error {
 pub struct Save(Vec<Object>);
 
 impl Save {
+    pub fn new_empty() -> Self {
+        Self(Vec::new())
+    }
     pub fn needed_update(&self, remote: DirContent) -> DirUpdate {
         use SyncAction::*;
 
@@ -122,7 +126,8 @@ impl FileStatus {
 }
 
 impl DirContent {
-    fn build_file_list(path: impl AsRef<Path>) -> Result<Vec<PathBuf>, Error> {
+    #[instrument(err)]
+    fn build_file_list(path: &Path) -> Result<Vec<PathBuf>, Error> {
         let mut paths = Vec::new();
         for res in WalkDir::new(path) {
             let entry = res?;
@@ -132,11 +137,13 @@ impl DirContent {
 
             paths.push(entry.into_path());
         }
+        dbg!();
         Ok(paths)
     }
 
+    #[instrument(err)]
     pub async fn from_path(path: PathBuf) -> Result<Self, Error> {
-        let paths = task::spawn_blocking(move || Self::build_file_list(path))
+        let paths = task::spawn_blocking(move || Self::build_file_list(&path))
             .await
             .expect("error joining dirwalker task");
 
