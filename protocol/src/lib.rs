@@ -6,7 +6,7 @@ pub use time;
 pub use tarpc;
 pub use uuid::Uuid;
 
-#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum Error {
     #[error("wrong username or password")]
     IncorrectLogin,
@@ -39,15 +39,16 @@ pub enum Event {
 }
 
 pub type UserId = u64;
+pub type HostId = Uuid;
 pub type SessionId = Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Host {
     pub addr: SocketAddr,
-    pub id: SessionId,
+    pub id: HostId,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct User {
     pub username: String,
 }
@@ -88,7 +89,7 @@ pub trait Service {
     async fn close_account(id: SessionId) -> Result<(), Error>;
     async fn await_event(id: SessionId) -> Result<Event, Error>;
     async fn host(id: SessionId) -> Result<Option<Host>, Error>;
-    async fn request_to_host(id: SessionId) -> Result<(), Error>;
+    async fn request_to_host(id: SessionId, host_id: HostId) -> Result<(), Error>;
     async fn dir_update(id: SessionId, dir: DirContent) -> Result<DirUpdate, Error>;
     async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
 
