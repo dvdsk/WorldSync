@@ -1,9 +1,9 @@
-use crate::gui::{host, login, RpcConn};
+use crate::gui::{RpcConn, host, hosting, login};
 use crate::Error;
 use futures::stream::{self, BoxStream};
 use protocol::tarpc::client::RpcError;
-use protocol::tarpc::context::{self, Context};
-use protocol::{tarpc, Host};
+use protocol::tarpc::context::Context;
+use protocol::Host;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, SystemTime};
@@ -11,14 +11,14 @@ use std::time::{Duration, SystemTime};
 #[derive(Debug, Clone)]
 pub enum Event {
     LoggedIn(RpcConn, Option<Host>),
+    WorldUpdated,
+    ServerStarted,
     HostPage(host::Event),
     LoginPage(login::Event),
-    StartHosting,
-    HostAssigned,
+    HostingPage(hosting::Event),
     Server(protocol::Event),
-    WorldUpdated,
     Error(Error),
-    None,
+    Empty,
 }
 
 impl From<protocol::Event> for Event {

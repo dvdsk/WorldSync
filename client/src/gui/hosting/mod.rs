@@ -1,6 +1,6 @@
-use iced::{Column, Command, Element, HorizontalAlignment, Length, Space, Text};
+use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
 pub use crate::Event as Msg;
-use super::parts::ErrorBar;
+use super::parts::{ClearError, ErrorBar};
 
 mod tasks;
 
@@ -16,6 +16,14 @@ impl From<protocol::Error> for Error {
 
 #[derive(Debug, Clone)]
 pub enum Event {
+    ClearError(Error),
+}
+
+impl ClearError for Event {
+    type Error = Error;
+    fn clear(e: Self::Error) -> Self {
+        Self::ClearError(e)
+    }
 }
 
 #[derive(Default)]
@@ -30,6 +38,7 @@ impl Page {
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         match dbg!(event) {
+            Event::ClearError(e) => self.errorbar.clear(e),
         }
         Command::none()
     }
@@ -40,17 +49,14 @@ impl Page {
         let top_spacer = Space::with_height(Length::FillPortion(1));
         let center_column = Column::new()
             .push(top_spacer)
-            .push(title())
-            .push(host_button(&mut self.host))
-            .push(self.downloading.view())
-            .push(self.loading_server.view());
+            .push(title());
 
         let ui = Row::new()
             .push(left_spacer)
             .push(center_column)
             .push(sidebar);
 
-        let errorbar = self.errorbar.view().map(move |e| Msg::HostPage(e));
+        let errorbar = self.errorbar.view().map(move |e| Msg::HostingPage(e));
         Column::new()
             .width(Length::Fill)
             .push(errorbar)

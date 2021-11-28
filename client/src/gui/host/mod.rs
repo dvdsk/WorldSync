@@ -1,9 +1,10 @@
-use std::ops::RangeInclusive;
+use std::hash::Hash;
 
 use crate::gui::parts::ClearError;
 pub use crate::Event as Msg;
 use crate::world_dl;
-use iced::{Button, Column, Command, Element, HorizontalAlignment, Length, ProgressBar, Row, Space, Text, button};
+use protocol::HostId;
+use iced::{Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text, button};
 
 use super::RpcConn;
 use super::parts::{ErrorBar, Loading};
@@ -30,7 +31,8 @@ pub enum Event {
     ClearError(Error),
     WantToHost,
     ObjToSync{left: usize},
-    DlStarting,
+    DlStarting{num_obj: usize},
+    WorldUpdated,
 }
 
 impl ClearError for Event {
@@ -46,6 +48,7 @@ pub struct Page {
     host: button::State,
     downloading: Loading,
     loading_server: Loading,
+    host_id: Option<HostId>,
 }
 
 impl Page {
@@ -58,6 +61,9 @@ impl Page {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::WantToHost => return self.request_to_host(rpc),
+            Event::ObjToSync{left} => self.downloading.set_progress(left as f32),
+            Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32),
+            Event::WorldUpdated => self.downloading.finished(),
         }
         Command::none()
     }
@@ -67,6 +73,8 @@ impl Page {
         let left_spacer = Space::with_width(Length::FillPortion(1));
         let top_spacer = Space::with_height(Length::FillPortion(1));
         let center_column = Column::new()
+            .align_items(Align::Center)
+            .width(Length::FillPortion(8))
             .push(top_spacer)
             .push(title())
             .push(host_button(&mut self.host))
@@ -94,6 +102,6 @@ fn title() -> Text {
 }
 
 fn host_button(state: &mut button::State) -> Button<Msg> {
-    Button::new(state, Text::new("Login"))
-        .on_press(Msg::StartHosting)
+    Button::new(state, Text::new("Host").horizontal_alignment(HorizontalAlignment::Center))
+        .on_press(Msg::HostPage(Event::WantToHost))
 }

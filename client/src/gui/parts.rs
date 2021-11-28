@@ -61,11 +61,26 @@ impl Default for Loading {
 }
 
 impl Loading {
+    pub fn set_progress(&mut self, val: f32) {
+        if let Loading::InProgress{value, ..} = self {
+            *value = val;
+        }
+    }
+    pub fn finished(&mut self) {
+        match self {
+            Loading::InProgress{value, range} => *value = *range.end(),
+            Loading::NotStarted => panic!("was not in progress"),
+        }
+    }
+    pub fn start(&mut self, complete: f32) {
+        *self = Loading::InProgress { range: 0.0..=complete+1.0, value: 0.0 }
+    }
+
     pub fn view(&self) -> Element<Msg> {
         use Loading::*;
         match self {
             NotStarted => Space::with_height(Length::FillPortion(1)).into(),
-            InProgress{range, value} => ProgressBar::new(range.clone(), *value).into(),
+            InProgress{range, value} => ProgressBar::new(range.clone(), dbg!(*value)).into(),
         }
     }
 }

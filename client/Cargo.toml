@@ -15,6 +15,7 @@ thiserror = "1"
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["registry"] }
+derivative = "2"
 iced = { version = "0.3" , features = ["tokio"] }
 iced_futures = "0.3"
 iced_native = "0.4"
@@ -22,8 +23,6 @@ wrapper = { path = "../wrapper" }
 sync = { path = "../sync" }
 
 [dev-dependencies]
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["registry"] }
 server = { path = "../server" }
 
 [features]

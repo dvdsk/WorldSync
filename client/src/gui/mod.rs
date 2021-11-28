@@ -1,4 +1,5 @@
-use crate::{events, Event};
+use crate::{events, world_dl, Event};
+use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{ServiceClient, Uuid};
 use tracing::info;
@@ -11,8 +12,12 @@ pub mod parts;
 mod style;
 mod tasks;
 
-#[derive(Clone, Debug)]
+use tasks::SubStatus;
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct RpcConn {
+    #[derivative(Debug = "ignore")]
     pub client: ServiceClient,
     pub session: Uuid,
 }
@@ -24,9 +29,10 @@ pub struct State {
     can_join: join::Page,
     page: Page,
 
-    server_events: Option<events::ServerSub>,
     rpc: Option<RpcConn>,
-    dl_world: Option<WorldDl>,
+    server_events: bool,
+    downloading_world: SubStatus,
+    mc_server: SubStatus,
 }
 
 impl State {
@@ -38,9 +44,10 @@ impl State {
             can_join: join::Page::new(),
             page: Page::Login,
 
-            server_events: None,
             rpc: None,
-            dl_world: None,
+            server_events: false,
+            downloading_world: SubStatus::default(),
+            mc_server: SubStatus::default(),
         }
     }
 }
@@ -70,43 +77,64 @@ impl Application for State {
         message: Self::Message,
         _clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
-        use Event::*;
         use protocol::Event::*;
+        use Event::*;
 
-        match message {
+        match dbg!(message) {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, &mut self.rpc),
-            LoggedIn(rpc, Some(host)) => {
-                info!("logged in, can join {:?}", host);
-                self.rpc = Some(rpc);
-                self.page = Page::Join;
-                // TODO add updater
+            LoggedIn(rpc, host) => {
+                self.server_events = true;
+                match host {
+                    Some(host) => {
+                        info!("logged in, can join {:?}", host);
+                        self.rpc = Some(rpc);
+                        self.page = Page::Join;
+                    }
+                    None => {
+                        info!("logged in, no one is hosting");
+                        self.rpc = Some(rpc);
+                        self.page = Page::Host;
+                    }
+                }
             }
-            LoggedIn(rpc, Option::None) => {
-                info!("logged in, no one is hosting");
-                self.rpc = Some(rpc);
-                self.page = Page::Host;
-                // TODO add updater
+            WorldUpdated => {
+                self.mc_server.start();
+                self.can_host.update(host::Event::WorldUpdated, &mut self.rpc);
             }
-            Server(NewHost(host)) if self.is_us(&host) => {
-                self.dl_world = Some(WorldDl::new());
+            ServerStarted => {
+                self.page = Page::Hosting;
+            }
+            Server(NewHost(host)) if self.can_host.is_us(&host) => {
+                info!("attempting to host");
+                self.downloading_world.start();
             }
             Server(NewHost(host)) => {
+                info!("got new host: {:?}", host);
                 self.can_join.host = Some(host);
                 self.page = Page::Join;
             }
             Server(TestHB(n)) => info!("recieved hb {}", n),
             Error(e) => panic!("tmp error remove {:?}", e),
+            Empty => (),
             _e => todo!("handle: {:?}", _e),
         }
         Command::none()
     }
 
     fn subscription(&self) -> Subscription<Event> {
-        match &self.rpc {
-            None => Subscription::none(),
-            Some(rpc) => events::sub_to_server(rpc.clone()),
+        let mut subs = Vec::new();
+        if self.server_events {
+            let rpc = self.rpc.as_ref().unwrap().clone();
+            subs.push(events::sub_to_server(rpc))
         }
+        if let Some(id) = self.downloading_world.active() {
+            dbg!();
+            let rpc = self.rpc.as_ref().unwrap().clone();
+            subs.push(world_dl::sub(rpc, id))
+        }
+
+        Subscription::batch(subs)
     }
 
     fn view(&mut self) -> Element<Event> {
