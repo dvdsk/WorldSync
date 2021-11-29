@@ -133,6 +133,9 @@ impl Application for State {
             let rpc = self.rpc.as_ref().unwrap().clone();
             subs.push(world_dl::sub(rpc, id))
         }
+        if let Some(_id) = self.mc_server.active() {
+            subs.push(mc_server::sub())
+        }
 
         Subscription::batch(subs)
     }

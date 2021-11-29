@@ -1,9 +1,9 @@
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 use time::Time;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
     #[error("Could not parse minecraft server output")]
     ParsingError,
@@ -69,6 +69,10 @@ pub enum Message {
     Exception(Exception),
     Stopping,
     Other(String),
+}
+
+pub fn parse(input: impl Into<String> + AsRef<str>) -> Result<Line, Error> {
+    line_parser::line(input.as_ref()).map_err(|_| Error::ParsingError)
 }
 
 peg::parser! {
@@ -238,8 +242,4 @@ peg::parser! {
             Line { time, source, level, msg }
         }
     }
-}
-
-pub fn parse(input: impl Into<String> + AsRef<str>) -> Result<Line, Error> {
-    line_parser::line(input.as_ref()).map_err(|_| Error::ParsingError)
 }

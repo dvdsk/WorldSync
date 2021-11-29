@@ -2,8 +2,8 @@ use std::io;
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, ChildStdin, Command};
+use tokio::io::{AsyncBufReadExt, BufReader, Lines};
+use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 
 pub mod parser;
 
@@ -18,9 +18,15 @@ pub enum Error {
         component in path is not a directory"
     )]
     IncorrectServerPath,
+    #[error("Could not parse minecraft server output: {0}")]
+    Parser(#[from] parser::Error),
 }
 
-pub struct Instance(Child);
+pub struct Instance {
+    process: Child,
+    stdout: Lines<BufReader<ChildStdout>>,
+    stderr: Lines<BufReader<ChildStderr>>,
+}
 
 const GC_ARGS: &[&'static str] = &[
     "-Dsun.rmi.dgc.server.gcInterval=2147483646", // do not garbace collect every min
@@ -58,33 +64,35 @@ impl Instance {
             .map_err(|e| Error::SpawnFailed(e.kind()))?;
 
         let stdin = wait_for(&mut child.stdin).await;
+        let stdout = BufReader::new(wait_for(&mut child.stdout).await).lines();
+        let stderr = BufReader::new(wait_for(&mut child.stderr).await).lines();
+
+        let instance = Self {
+            process: child,
+            stdout,
+            stderr,
+        };
         let handle = Handle(stdin);
-        Ok((Self(child), handle))
+        Ok((instance, handle))
     }
 
-    pub async fn maintain(mut self) -> Result<(), Error> {
-        let mut stdout = BufReader::new(wait_for(&mut self.0.stdout).await).lines();
-        let mut stderr = BufReader::new(wait_for(&mut self.0.stderr).await).lines();
-
+    pub async fn next_event(&mut self) -> Result<parser::Line, Error> {
         loop {
-            let stop = tokio::select! {
-                res = stdout.next_line() => {
+            tokio::select! {
+                res = self.stdout.next_line() => {
                     match res {
                         Err(e) => return Err(Error::Pipe(e.kind())),
-                        Ok(Some(line)) => handle_stdout(line).await,
-                        Ok(None) => false,
+                        Ok(Some(line)) => return handle_stdout(line),
+                        Ok(None) => continue,
                     }
                 }
-                res = stderr.next_line() => {
+                res = self.stderr.next_line() => {
                     match res {
                         Err(e) => return Err(Error::Pipe(e.kind())),
-                        Ok(Some(line)) => handle_stderr(line).await,
-                        Ok(None) => false,
+                        Ok(Some(line)) => return Err(handle_stderr(line)),
+                        Ok(None) => continue,
                     }
                 }
-            };
-            if stop {
-                return Ok(());
             }
         }
     }
@@ -100,14 +108,12 @@ async fn wait_for<T>(source: &mut Option<T>) -> T {
     }
 }
 
-async fn handle_stdout(line: String) -> bool {
-    dbg!(line);
-    false
+fn handle_stdout(line: String) -> Result<parser::Line, Error> {
+    parser::parse(line).map_err(|e| e.into())
 }
 
-async fn handle_stderr(line: String) -> bool {
-    // dbg!(line);
-    false
+fn handle_stderr(line: String) -> Error  {
+    todo!()
 }
 
 pub struct Handle(ChildStdin);
