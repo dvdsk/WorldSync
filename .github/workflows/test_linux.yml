@@ -1,0 +1,32 @@
+name: Test
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os:
+          - windows-latest 
+          - macos-latest 
+          - ubuntu-latest]
+    run-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Test client
+      working-directory: ./client
+      run: cargo test --verbose
+    - name: Test wrapper
+      working-directory: ./wrapper
+      run: cargo test --verbose
+    - name: Test server
+      working-directory: ./server
+      run: cargo test --verbose
