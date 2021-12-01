@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
 pub use crate::Event as Msg;
 use super::parts::{ClearError, ErrorBar};
@@ -17,6 +19,7 @@ impl From<protocol::Error> for Error {
 #[derive(Debug, Clone)]
 pub enum Event {
     ClearError(Error),
+    Handle(Arc<wrapper::Handle>),
 }
 
 impl ClearError for Event {
@@ -29,6 +32,7 @@ impl ClearError for Event {
 #[derive(Default)]
 pub struct Page {
     errorbar: ErrorBar<Error>,
+    server: Option<wrapper::Handle>,
 }
 
 impl Page {
@@ -39,6 +43,10 @@ impl Page {
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         match dbg!(event) {
             Event::ClearError(e) => self.errorbar.clear(e),
+            Event::Handle(h) => {
+                let h = Arc::try_unwrap(h).expect("could not get ownership over server handle");
+                self.server = Some(h);
+            }
         }
         Command::none()
     }

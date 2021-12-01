@@ -17,6 +17,7 @@ pub enum Event {
     LoginPage(login::Event),
     HostingPage(hosting::Event),
     Server(protocol::Event),
+    McServer,
     Error(Error),
     Empty,
 }

@@ -1,4 +1,4 @@
-use crate::{events, world_dl, Event};
+use crate::{events, world_dl, mc, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{ServiceClient, Uuid};
@@ -129,12 +129,11 @@ impl Application for State {
             subs.push(events::sub_to_server(rpc))
         }
         if let Some(id) = self.downloading_world.active() {
-            dbg!();
             let rpc = self.rpc.as_ref().unwrap().clone();
             subs.push(world_dl::sub(rpc, id))
         }
         if let Some(_id) = self.mc_server.active() {
-            subs.push(mc_server::sub())
+            subs.push(mc::sub())
         }
 
         Subscription::batch(subs)

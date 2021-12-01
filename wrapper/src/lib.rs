@@ -117,3 +117,9 @@ fn handle_stderr(line: String) -> Error  {
 }
 
 pub struct Handle(ChildStdin);
+
+impl std::fmt::Debug for Handle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Handle to mc server")
+    }
+}
