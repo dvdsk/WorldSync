@@ -21,6 +21,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    -uses: Swatinem/rust-cache@v1
+
     - name: Test client
       working-directory: ./client
       run: cargo test --verbose
