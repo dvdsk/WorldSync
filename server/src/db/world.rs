@@ -88,6 +88,7 @@ impl WorldDb {
     pub async fn add_obj(id: ObjectId, bytes: &[u8]) -> Result<(), Error> {
         let mut path = Self::obj_path().to_owned();
         path.push(id.0.to_string());
+        dbg!(bytes.len());
 
         fs::write(&path, bytes)
             .await

@@ -56,16 +56,11 @@ impl World {
 
         let content = DirContent::from_path(source).await.unwrap();
         let (new_save, update_list) = UpdateList::for_new_save(&self.db, content);
-        dbg!();
         for (object_id, path) in update_list.0 {
-            dbg!();
             let bytes = tokio::fs::read(path).await.unwrap();
-            dbg!();
             WorldDb::add_obj(object_id, &bytes).await?;
         }
-        dbg!();
         self.db.push_save(new_save);
-        dbg!();
 
         Ok(())
     }

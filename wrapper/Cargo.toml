@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 tokio = {version = "1", features = ["process", "io-util", "macros", "rt-multi-thread", "fs", "time"]}
-# tokio-stream = {version ="0.1", features = ["io-util"]}
 thiserror = "1"
 peg = "0.7"
 time = "0.3"
-# pest = "2"
-# pest_derive = "2"
+
+[dev-dependencies]
+reqwest = "0.11"

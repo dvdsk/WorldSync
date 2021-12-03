@@ -7,7 +7,7 @@ use protocol::tarpc::tokio_serde::formats::Json;
 use tokio::net::TcpStream;
 use tokio::time::sleep;
 
-static FREE_PORT: AtomicU16 = AtomicU16::new(8080);
+static FREE_PORT: AtomicU16 = AtomicU16::new(34879);
 pub fn free_port() -> u16 {
     FREE_PORT.fetch_add(1, Ordering::Relaxed)
 }

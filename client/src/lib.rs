@@ -35,7 +35,7 @@ async fn connect_tcp(domain: &str, port: u16) -> Result<TlsStream<TcpStream>, st
 
     let host = format!("{}:{}", domain, port);
     let stream = TcpStream::connect(host).await?;
-    connector.connect(servername, stream).await.unwrap()
+    connector.connect(servername, stream).await
 }
 
 #[cfg(not(feature = "deployed"))]

@@ -1,0 +1,82 @@
+name: Build and Release
+
+on:
+  push:
+    # complemented with branch protection on main this will 
+    # run on any pull request merge
+    branches: main 
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - windows-latest 
+          - macos-latest 
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          client/target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: build client
+      working-directory: ./client
+      run: cargo build --release --features deployed
+
+    - name: upload windows build
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-artifact@v2
+      with: 
+        name: ${{ matrix.os }}
+        path: client/target/release/client.exe
+        retention-days: 1
+
+    - name: upload other build
+      if: matrix.os != 'windows-latest'
+      uses: actions/upload-artifact@v2
+      with: 
+        name: ${{ matrix.os }}
+        path: client/target/release/client
+        retention-days: 1
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: download binaries
+      uses: actions/download-artifact@v2
+    - name: display files
+      run: ls -la
+    - name: rename binaries
+      run: |
+        mv windows-latest/client.exe client-win.exe
+        mv macos-latest/client client-macos
+        mv ubuntu-latest/client client-linux
+    - name: display files
+      run: ls -la
+    - name: release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          client-win.exe
+          client-macos
+          client-linux
+        body: nightly build
+        draft: true

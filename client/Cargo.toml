@@ -26,4 +26,4 @@ sync = { path = "../sync" }
 server = { path = "../server" }
 
 [features]
-deployed = []
+deployed = [] # encrypt connection with Tls and do not auto fill test credentials

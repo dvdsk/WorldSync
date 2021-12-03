@@ -1,5 +1,7 @@
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 
+use protocol::tarpc::context::Context;
 use protocol::{tarpc, User, UserId};
 use tarpc::context;
 
@@ -217,8 +219,11 @@ impl Tui {
             println!("can not load empty save");
         }
 
+        let mut context = Context::current();
+        context.deadline = SystemTime::now() + Duration::from_secs(60*5);
+        println!("started importing save, this might take up to 5 minutes");
         self.client
-            .set_save(context::current(), path.clone())
+            .set_save(context, path.clone())
             .await
             .expect("rpc failure")
             .unwrap();

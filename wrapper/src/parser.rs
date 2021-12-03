@@ -37,7 +37,7 @@ pub enum Exception {
     Unknown(String),
 }
 
-/// only java version numbers post 1.0.0 are supported
+/// only minecraft version numbers post 1.0.0 are supported
 /// versions earlier then 1.14 will end up as unknown
 #[derive(Debug, PartialEq)]
 pub enum Version {

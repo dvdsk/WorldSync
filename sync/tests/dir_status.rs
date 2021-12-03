@@ -34,11 +34,11 @@ async fn dir_with_files() {
         file.write_all(b"Hello, world!").unwrap();
     }
 
-    let dir_status = DirContent::from_path(PathBuf::from("test_data/dir_with_files"))
+    let mut dir_status = DirContent::from_path(PathBuf::from("test_data/dir_with_files"))
         .await
         .unwrap();
 
-    let correct = DirContent(vec![
+    let mut correct = DirContent(vec![
         FileStatus {
             path: PathBuf::from("test_data/dir_with_files/applesaus"),
             hash: 469007863229145464,
@@ -52,5 +52,7 @@ async fn dir_with_files() {
             hash: 469007863229145464,
         },
     ]);
+    correct.0.sort_by_key(|k| k.path.clone());
+    dir_status.0.sort_by_key(|k| k.path.clone());
     assert_eq!(dir_status, correct)
 }

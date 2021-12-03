@@ -1,9 +1,10 @@
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+use tokio::time::timeout;
 
 pub mod parser;
 
@@ -20,10 +21,17 @@ pub enum Error {
     IncorrectServerPath,
     #[error("Could not parse minecraft server output: {0}")]
     Parser(#[from] parser::Error),
+    #[error("Unknown error, multi line msg might be truncated: {0}")]
+    Unknown(String),
+    #[error("No jar file 'server.jar' found at: {0}")]
+    NoJar(PathBuf),
+    #[error("Java version outdated")]
+    OutdatedJava{required: String}
 }
 
 pub struct Instance {
     process: Child,
+    working_dir: PathBuf,
     stdout: Lines<BufReader<ChildStdout>>,
     stderr: Lines<BufReader<ChildStderr>>,
 }
@@ -44,14 +52,14 @@ impl Instance {
         server_path: impl AsRef<Path>,
         mem_size: u8,
     ) -> Result<(Self, Handle), Error> {
-        let full_path = tokio::fs::canonicalize(server_path)
+        let working_dir = tokio::fs::canonicalize(server_path)
             .await
             .map_err(|_| Error::IncorrectServerPath)?;
         let mut child = Command::new("java")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::piped())
-            .current_dir(full_path)
+            .current_dir(&working_dir)
             .arg("-XX:+UseG1GC") // use G1GC garbace collector
             // max memory size, recommanded 4G
             .arg(format!("-Xmx{}G", mem_size))
@@ -69,6 +77,7 @@ impl Instance {
 
         let instance = Self {
             process: child,
+            working_dir,
             stdout,
             stderr,
         };
@@ -89,7 +98,7 @@ impl Instance {
                 res = self.stderr.next_line() => {
                     match res {
                         Err(e) => return Err(Error::Pipe(e.kind())),
-                        Ok(Some(line)) => return Err(handle_stderr(line)),
+                        Ok(Some(line)) => return Err(handle_stderr(line, self).await),
                         Ok(None) => continue,
                     }
                 }
@@ -112,11 +121,38 @@ fn handle_stdout(line: String) -> Result<parser::Line, Error> {
     parser::parse(line).map_err(|e| e.into())
 }
 
-fn handle_stderr(line: String) -> Error  {
-    todo!()
+async fn collect_lines(stderr: &mut Lines<BufReader<ChildStderr>>, lines: &mut String) {
+    while let Some(line) = stderr.next_line().await.unwrap() {
+        lines.push('\n');
+        lines.push_str(&line);
+    }
+}
+
+async fn handle_stderr(line: String, instance: &mut Instance) -> Error  {
+    // output is probably multiline, try to collect a few more lines
+    let mut lines = line;
+    let collect = collect_lines(&mut instance.stderr, &mut lines);
+    timeout(Duration::from_millis(10), collect).await.unwrap();
+
+    match lines.lines().next().unwrap() {
+        "Error: Unable to access jarfile server.jar" => {
+            Error::NoJar(instance.working_dir.clone())
+        }
+        "Error: LinkageError occurred while loading main class net.minecraft.bundler.Main" => {
+            outdated_java_error(&lines)
+        }
+        _ => Error::Unknown(lines),
+    }
 }
 
 pub struct Handle(ChildStdin);
+
+pub fn outdated_java_error(lines: &String) -> Error {
+    let start = lines.find("class file version ").unwrap();
+    let stop = start + lines[start..].find(')').unwrap();
+    let required = lines[start..stop].to_owned();
+    Error::OutdatedJava{required}
+}
 
 impl std::fmt::Debug for Handle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
