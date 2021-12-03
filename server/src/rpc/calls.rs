@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::db::world::WorldDb;
 use sync::{DirContent, DirUpdate, ObjectId};
 
@@ -204,6 +206,33 @@ impl Service for ConnState {
         }
         let name = self.userdb.remove_user(id).await?;
         info!("removed user: {}", name);
+        Ok(())
+    }
+
+    async fn dump_save(self, _: context::Context, dir: PathBuf) -> Result<(), Error> {
+        if !self.peer_addr.ip().is_loopback() {
+            return Err(Error::Unauthorized);
+        }
+        
+        if !dir.exists() {
+            return Err(Error::DirDoesNotExist);
+        }
+
+        self.world.dump_save(dir).await;
+        Ok(())
+    }
+
+    async fn set_save(self, _: context::Context, dir: PathBuf) -> Result<(), Error> {
+        if !self.peer_addr.ip().is_loopback() {
+            return Err(Error::Unauthorized);
+        }
+        
+        if !dir.exists() {
+            return Err(Error::DirDoesNotExist);
+        }
+
+        self.world.load_save(dir.clone()).await?;
+        info!("set save to whatever was in: {:?}", dir);
         Ok(())
     }
 }

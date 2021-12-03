@@ -17,6 +17,8 @@ pub enum Error {
     NoMetaConn,
     #[error("Error downloading world: {0}")]
     Sync(#[from] world_dl::Error),
+    #[error("Could not start minecraft server")]
+    ServerStart(#[from] wrapper::Error),
 }
 
 impl From<protocol::Error> for Error {

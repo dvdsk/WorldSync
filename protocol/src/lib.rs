@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use sync::{DirContent, DirUpdate, ObjectId};
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,11 @@ pub enum Error {
     #[error("missed to many server events, need to log in again")]
     Lagging,
     #[error("a sessions backlog should not be accessed concurrently")]
-    BackLogLocked
+    BackLogLocked,
+    #[error("could not dump save, target directory does not exist")]
+    DirDoesNotExist,
+    #[error("could not load save, someone is currently hosting")]
+    SaveInUse,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -98,6 +103,8 @@ pub trait Service {
     async fn override_account(id: UserId, old: User, new: User) -> Result<(), Error>;
     async fn override_password(id: UserId, new: String) -> Result<(), Error>;
     async fn remove_account(id: UserId) -> Result<(), Error>;
+    async fn dump_save(dir: PathBuf) -> Result<(), Error>;
+    async fn set_save(dir: PathBuf) -> Result<(), Error>;
 }
 
 #[cfg(test)]

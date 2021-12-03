@@ -83,6 +83,7 @@ impl Application for State {
         match dbg!(message) {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, &mut self.rpc),
+            HostingPage(event) => return self.hosting.update(event),
             LoggedIn(rpc, host) => {
                 self.server_events = true;
                 match host {

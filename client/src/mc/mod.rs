@@ -2,14 +2,14 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use futures::stream::{self, BoxStream};
+use tracing::info;
 use wrapper::Instance;
 
 use crate::Event;
 
 // pub mod server;
 pub fn sub() -> iced::Subscription<Event> {
-    iced::Subscription::from_recipe(McServer {} )
-
+    iced::Subscription::from_recipe(McServer {})
 }
 
 pub struct McServer {}
@@ -17,13 +17,13 @@ pub struct McServer {}
 enum Phase {
     Start,
     Running,
+    Error,
 }
 
 struct State {
     phase: Phase,
     instance: Option<Instance>,
 }
-
 
 impl<H, I> iced_native::subscription::Recipe<H, I> for McServer
 where
@@ -38,27 +38,39 @@ where
 
     fn stream(self: Box<Self>, _input: BoxStream<'static, I>) -> BoxStream<'static, Self::Output> {
         Box::pin(stream::unfold(
-            State { phase: Phase::Start, instance: None },
-            move |state| async move {
-                work_on(state).await
+            State {
+                phase: Phase::Start,
+                instance: None,
             },
+            move |state| async move { state_machine(state).await },
         ))
     }
 }
 
-use crate::gui::hosting::Event as hEvent;
-async fn work_on(mut state: State) -> Option<(Event, State)> {
-    match state.phase {
-        Phase::Start => {
-            let (instance, handle) = Instance::start("tests/data", 2)
-                .await.unwrap();
+async fn start(mut state: State) -> (Event, State) {
+    info!("starting minecraft server");
+    match Instance::start("tests/data", 2).await {
+        Err(e) => {
+            use crate::gui::host::Event as hEvent;
+            let event = Event::HostPage(hEvent::Error(e.into()));
+            state.phase = Phase::Error;
+            (event, state)
+        }
+        Ok((instance, handle)) => {
             state.instance = Some(instance);
             state.phase = Phase::Running;
             let handle = Arc::new(handle);
+            use crate::gui::hosting::Event as hEvent;
             let event = Event::HostingPage(hEvent::Handle(handle));
-            Some((event, state))
+            (event, state)
         }
-        Phase::Running => todo!(),
     }
 }
 
+async fn state_machine(state: State) -> Option<(Event, State)> {
+    match state.phase {
+        Phase::Start => Some(start(state).await),
+        Phase::Running => todo!(),
+        Phase::Error => None,
+    }
+}

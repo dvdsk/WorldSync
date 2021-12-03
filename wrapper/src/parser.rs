@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use time::Time;
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Error {
     #[error("Could not parse minecraft server output")]
     ParsingError,

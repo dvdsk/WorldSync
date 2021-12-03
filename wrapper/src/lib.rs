@@ -7,7 +7,7 @@ use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 
 pub mod parser;
 
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error, Hash, PartialEq, Eq)]
 pub enum Error {
     #[error("Could not start server process")]
     SpawnFailed(io::ErrorKind),

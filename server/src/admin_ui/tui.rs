@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use protocol::{tarpc, User, UserId};
 use tarpc::context;
 
@@ -22,19 +24,23 @@ pub async fn main_menu(client: ServiceClient) {
     let mut ui = Tui { client };
     loop {
         let selection = Select::new()
+            .item("Exit")
             .item("Add user")
             .item("Modify user")
             .item("Remove user")
-            .item("Exit")
+            .item("Dump save")
+            .item("Set save")
             .interact()
             .unwrap();
 
         match selection {
-            0 => ui.add_user().await,
-            1 => ui.modify_user().await,
-            2 => ui.remove_user().await,
-            3 => return,
-            _ => panic!("impossible"),
+            0 => return,
+            1 => ui.add_user().await,
+            2 => ui.modify_user().await,
+            3 => ui.remove_user().await,
+            4 => ui.dump_save().await,
+            5 => ui.set_save().await,
+            _ => unreachable!(),
         }
     }
 }
@@ -173,6 +179,51 @@ impl Tui {
 
         Ok(list.remove(selection))
     }
+
+    async fn dump_save(&self) {
+        let path = dump_path();
+        if !path.exists() {
+            tokio::fs::create_dir(&path)
+                .await
+                .expect("could not directory for save dump");
+        }
+        let path = tokio::fs::canonicalize(path).await.unwrap();
+
+        self.client
+            .dump_save(context::current(), path.clone())
+            .await
+            .expect("rpc failure")
+            .unwrap();
+        println!("dumped last save to {:?}", path);
+    }
+
+    async fn set_save(&self) {
+        let path = dump_path();
+        if !path.exists() {
+            tokio::fs::create_dir(&path)
+                .await
+                .expect("could not load save as there is no where to load from, try dumping the save first");
+        }
+        let path = tokio::fs::canonicalize(dump_path()).await.unwrap();
+        let is_empty = tokio::fs::read_dir(&path)
+            .await
+            .expect("could not check save dump content")
+            .next_entry()
+            .await
+            .unwrap()
+            .is_none();
+
+        if is_empty {
+            println!("can not load empty save");
+        }
+
+        self.client
+            .set_save(context::current(), path.clone())
+            .await
+            .expect("rpc failure")
+            .unwrap();
+        println!("set the current save to the content of: {:?}", path);
+    }
 }
 
 fn change_username(user: &mut User) {
@@ -220,4 +271,8 @@ fn change_password(pass: &mut Option<String>) {
     } else {
         *pass = Some(new_pass)
     }
+}
+
+fn dump_path() -> &'static Path {
+    Path::new("save_dump")
 }

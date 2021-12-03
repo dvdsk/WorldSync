@@ -20,11 +20,12 @@ impl From<protocol::Error> for Error {
 pub enum Event {
     ClearError(Error),
     Handle(Arc<wrapper::Handle>),
+    Error(Error),
 }
 
 impl ClearError for Event {
     type Error = Error;
-    fn clear(e: Self::Error) -> Self {
+    fn clear(e: Error) -> Self {
         Self::ClearError(e)
     }
 }
@@ -42,6 +43,7 @@ impl Page {
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         match dbg!(event) {
+            Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::Handle(h) => {
                 let h = Arc::try_unwrap(h).expect("could not get ownership over server handle");

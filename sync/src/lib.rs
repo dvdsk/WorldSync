@@ -9,10 +9,10 @@ use serde::{Serialize, Deserialize};
 use tracing::instrument;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Object {
-    org_path: PathBuf,
+pub struct Object {
+    pub org_path: PathBuf,
     hash: u64,
-    id: ObjectId,
+    pub id: ObjectId,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -29,6 +29,9 @@ pub struct Save(Vec<Object>);
 impl Save {
     pub fn new_empty() -> Self {
         Self(Vec::new())
+    }
+    pub fn objects(&self) -> &Vec<Object> {
+        &self.0
     }
     pub fn needed_update(&self, remote: DirContent) -> DirUpdate {
         use SyncAction::*;
@@ -77,7 +80,6 @@ impl UpdateList {
                 id: obj_id,
             })
         }
-
         (Save(new_save), UpdateList(new_objects))
     }
 }
@@ -91,6 +93,8 @@ pub enum SyncAction {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ObjectId(pub u64);
+/// list of the paths on the remote that need to be uploaded
+/// and the objectid they should be assigned
 #[derive(Debug, Clone)]
 pub struct UpdateList(pub Vec<(ObjectId, PathBuf)>);
 
@@ -111,11 +115,9 @@ pub struct FileStatus {
 
 impl FileStatus {
     async fn new(path: PathBuf) -> Result<FileStatus, Error> {
-        dbg!(&path);
         let mut file = File::open(&path).await?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes).await?;
-        dbg!();
 
         let hash = task::spawn_blocking(move || seahash::hash(&bytes));
         Ok(FileStatus {
@@ -137,7 +139,6 @@ impl DirContent {
 
             paths.push(entry.into_path());
         }
-        dbg!();
         Ok(paths)
     }
 

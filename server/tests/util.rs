@@ -48,7 +48,7 @@ pub async fn test_server(port: u16) {
     use server::db::user::UserDb;
 
     let db = server::db::test_db();
-    let world = server::World::from(db.clone());
+    let world = server::World::from(db.clone()).await;
     let mut userdb = UserDb::from(db);
 
     use protocol::User;
