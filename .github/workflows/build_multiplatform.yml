@@ -34,7 +34,7 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           client/target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
     - name: build client
       working-directory: ./client
