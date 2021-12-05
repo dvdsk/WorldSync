@@ -82,6 +82,11 @@ pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+use bincode::config::Options;
+pub fn bincode_opts() -> impl bincode::Options + Copy {
+    bincode::options().with_no_limit()
+}
+
 /// This is the service definition. It looks a lot like a trait definition.
 /// It defines one RPC, hello, which takes one arg, name, and returns a String.
 #[tarpc::service]
@@ -105,12 +110,4 @@ pub trait Service {
     async fn remove_account(id: UserId) -> Result<(), Error>;
     async fn dump_save(dir: PathBuf) -> Result<(), Error>;
     async fn set_save(dir: PathBuf) -> Result<(), Error>;
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

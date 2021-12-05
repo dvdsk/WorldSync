@@ -12,7 +12,7 @@ use tracing::info;
 use shared::tarpc;
 use protocol::{Service, UserId};
 use tarpc::server::{incoming::Incoming, Channel};
-use tarpc::tokio_serde::formats::Json;
+use tarpc::tokio_serde::formats::Bincode;
 use uuid::Uuid;
 
 pub mod admin_ui;
@@ -86,7 +86,7 @@ pub async fn host(
     info!("starting listener on port {}", port);
     // JSON transport is provided by the json_transport tarpc module. It makes it easy
     // to start up a serde-powered json serialization strategy over TCP.
-    let mut listener = tarpc::serde_transport::tcp::listen(&server_addr, Json::default)
+    let mut listener = tarpc::serde_transport::tcp::listen(&server_addr, Bincode::default)
         .await
         .unwrap();
     listener.config_mut().max_frame_length(usize::MAX);

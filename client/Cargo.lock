@@ -276,6 +276,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tracing",
  "tracing-subscriber 0.3.3",
  "wrapper",
@@ -2203,6 +2204,7 @@ dependencies = [
 name = "protocol"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "serde",
  "shared",
  "sync",
@@ -2575,6 +2577,7 @@ dependencies = [
  "rand",
  "rust-argon2",
  "serde",
+ "shared",
  "structopt",
  "sync",
  "thiserror",
@@ -2620,6 +2623,8 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "tarpc",
+ "tracing",
+ "tracing-subscriber 0.3.3",
 ]
 
 [[package]]

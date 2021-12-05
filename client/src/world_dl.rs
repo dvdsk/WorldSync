@@ -202,7 +202,7 @@ async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Erro
 async fn download_obj(conn: &mut RpcConn, id: ObjectId) -> Result<Vec<u8>, Error> {
     let bytes = conn
         .client
-        .get_object(crate::context(2 * 60), conn.session, id)
+        .get_object(shared::context(2 * 60), conn.session, id)
         .await??;
     Ok(bytes)
 }

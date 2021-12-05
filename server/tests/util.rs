@@ -12,27 +12,6 @@ pub fn free_port() -> u16 {
     FREE_PORT.fetch_add(1, Ordering::Relaxed)
 }
 
-fn setup_tracing() {
-    use tracing_subscriber::{filter, prelude::*};
-
-    let filter_modules = filter::filter_fn(|metadata| {
-        if let Some(module) = metadata.module_path() {
-            !module.contains("tarp")
-        } else {
-            true
-        }
-    });
-    let fmt = tracing_subscriber::fmt::layer()
-        .pretty()
-        .with_test_writer();
-
-    let _ignore_err = tracing_subscriber::registry()
-        .with(fmt)
-        .with(filter::LevelFilter::INFO)
-        .with(filter_modules)
-        .try_init();
-}
-
 async fn connect_tcp(_domain: &str, port: u16) -> Result<TcpStream, std::io::Error> {
     TcpStream::connect(format!("127.0.0.1:{}", port)).await
 }

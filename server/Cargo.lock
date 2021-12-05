@@ -652,6 +652,7 @@ dependencies = [
 name = "protocol"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "serde",
  "shared",
  "sync",
@@ -849,6 +850,8 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "tarpc",
+ "tracing",
+ "tracing-subscriber 0.3.3",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@ pub use protocol::ServiceClient;
 use protocol::Host;
 use shared::tarpc;
 pub use tarpc::context;
+use tracing::instrument;
 
 use super::{Error, Event, Msg, Page};
 use futures::future;
@@ -14,6 +15,7 @@ fn parse_server_str(server_str: &str) -> Result<(String, u16), Error> {
     return Ok((domain.to_owned(), port));
 }
 
+#[instrument(err)]
 pub async fn login(
     domain: String,
     port: u16,
