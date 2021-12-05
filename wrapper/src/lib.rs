@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::time::timeout;
+use tracing::instrument;
 
 pub mod parser;
 
@@ -29,6 +30,7 @@ pub enum Error {
     OutdatedJava{required: String}
 }
 
+#[derive(Debug)]
 pub struct Instance {
     process: Child,
     working_dir: PathBuf,
@@ -48,8 +50,9 @@ const GC_ARGS: &[&'static str] = &[
 impl Instance {
     /// this assumes the server jar is named `server.jar` and located in
     /// the folder passed as paramater `server_path`
+    #[instrument(err)]
     pub async fn start(
-        server_path: impl AsRef<Path>,
+        server_path: &Path,
         mem_size: u8,
     ) -> Result<(Self, Handle), Error> {
         let working_dir = tokio::fs::canonicalize(server_path)
@@ -85,6 +88,7 @@ impl Instance {
         Ok((instance, handle))
     }
 
+    #[instrument(err)]
     pub async fn next_event(&mut self) -> Result<parser::Line, Error> {
         loop {
             tokio::select! {

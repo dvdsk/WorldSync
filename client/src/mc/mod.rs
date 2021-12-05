@@ -1,4 +1,5 @@
 use std::hash::{Hash, Hasher};
+use std::path::Path;
 use std::sync::Arc;
 
 use futures::stream::{self, BoxStream};
@@ -49,7 +50,7 @@ where
 
 async fn start(mut state: State) -> (Event, State) {
     info!("starting minecraft server");
-    match Instance::start("tests/data", 2).await {
+    match Instance::start(Path::new("tests/data"), 2).await {
         Err(e) => {
             use crate::gui::host::Event as hEvent;
             let event = Event::HostPage(hEvent::Error(e.into()));
