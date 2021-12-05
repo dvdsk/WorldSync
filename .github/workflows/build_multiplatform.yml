@@ -79,4 +79,4 @@ jobs:
           client-macos
           client-linux
         body: nightly build
-        draft: true
+        prerelease: true
