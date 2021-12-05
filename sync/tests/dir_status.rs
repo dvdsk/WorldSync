@@ -40,15 +40,15 @@ async fn dir_with_files() {
 
     let mut correct = DirContent(vec![
         FileStatus {
-            path: PathBuf::from("test_data/dir_with_files/applesaus"),
+            path: PathBuf::from("dir_with_files/applesaus"),
             hash: 469007863229145464,
         },
         FileStatus {
-            path: PathBuf::from("test_data/dir_with_files/foo.txt"),
+            path: PathBuf::from("dir_with_files/foo.txt"),
             hash: 469007863229145464,
         },
         FileStatus {
-            path: PathBuf::from("test_data/dir_with_files/world1_mca.mca"),
+            path: PathBuf::from("dir_with_files/world1_mca.mca"),
             hash: 469007863229145464,
         },
     ]);

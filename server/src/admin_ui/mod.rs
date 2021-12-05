@@ -1,4 +1,5 @@
-use protocol::{tarpc, ServiceClient};
+use protocol::ServiceClient;
+use shared::tarpc;
 use tarpc::client::Config;
 use tarpc::tokio_serde::formats::Json;
 use tokio::net::TcpStream;

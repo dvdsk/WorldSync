@@ -4,7 +4,8 @@ use crate::db::world::WorldDb;
 use sync::{DirContent, DirUpdate, ObjectId};
 
 use super::ConnState;
-use protocol::{tarpc, Host, HostId, Service, SessionId, User, UserId};
+use shared::tarpc;
+use protocol::{Host, HostId, Service, SessionId, User, UserId};
 use protocol::{Error, Event};
 use tarpc::context;
 use tokio::sync::broadcast::error::RecvError;

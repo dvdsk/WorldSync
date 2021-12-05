@@ -1,6 +1,6 @@
 use protocol::User;
 
-use protocol::tarpc::context;
+use shared::tarpc::context;
 
 mod util;
 use util::{free_port, test_conn, test_server};

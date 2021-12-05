@@ -1,4 +1,4 @@
-use protocol::tarpc;
+use shared::tarpc;
 use tarpc::client::Config;
 pub use tarpc::context;
 
@@ -9,8 +9,10 @@ use tokio::net::TcpStream;
 mod error;
 mod events;
 mod world_dl;
+mod util;
 pub mod gui;
 pub mod mc;
+pub use util::context;
 pub use error::Error;
 pub use events::Event;
 pub use world_dl::WorldDl;

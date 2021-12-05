@@ -1,6 +1,7 @@
 use crate::gui::{RpcConn, style};
 pub use protocol::ServiceClient;
-use protocol::{Host, tarpc};
+use protocol::Host;
+use shared::tarpc;
 pub use tarpc::context;
 
 use super::{Error, Event, Msg, Page};

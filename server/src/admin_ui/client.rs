@@ -1,4 +1,4 @@
-use protocol::tarpc::context;
+use shared::tarpc::context;
 use protocol::{User, UserId};
 
 use crate::admin_ui::tui::Tui;

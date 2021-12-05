@@ -1,8 +1,8 @@
 use crate::gui::{RpcConn, host, hosting, login};
 use crate::Error;
 use futures::stream::{self, BoxStream};
-use protocol::tarpc::client::RpcError;
-use protocol::tarpc::context::Context;
+use shared::tarpc::client::RpcError;
+use shared::tarpc::context::Context;
 use protocol::Host;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};

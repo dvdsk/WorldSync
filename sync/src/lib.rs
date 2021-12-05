@@ -1,12 +1,12 @@
 use futures::future::join_all;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::task;
-use walkdir::WalkDir;
-use serde::{Serialize, Deserialize};
 use tracing::instrument;
+use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Object {
@@ -129,15 +129,19 @@ impl FileStatus {
 
 impl DirContent {
     #[instrument(err)]
-    fn build_file_list(path: &Path) -> Result<Vec<PathBuf>, Error> {
+    fn build_file_list(dir: &Path) -> Result<Vec<PathBuf>, Error> {
         let mut paths = Vec::new();
-        for res in WalkDir::new(path) {
-            let entry = res?;
+        for res in WalkDir::new(dir) {
+            let entry = res.unwrap(); //?;
             if entry.file_type().is_dir() {
                 continue;
             }
 
-            paths.push(entry.into_path());
+            let path = match dir.parent() {
+                Some(base) => entry.into_path().strip_prefix(base).unwrap().to_owned(),
+                None => entry.into_path(),
+            };
+            paths.push(path);
         }
         Ok(paths)
     }

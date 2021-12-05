@@ -1,5 +1,5 @@
 use protocol::{Error, SessionId, User};
-use protocol::tarpc::context;
+use shared::tarpc::context;
 
 use protocol::Uuid;
 

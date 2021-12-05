@@ -1,9 +1,10 @@
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-use protocol::tarpc::context::Context;
-use protocol::{tarpc, User, UserId};
+use shared::tarpc::context::Context;
+use shared::tarpc;
 use tarpc::context;
+use protocol::{User, UserId};
 
 use super::ServiceClient;
 use dialoguer::{Confirm, Input, Password, Select};

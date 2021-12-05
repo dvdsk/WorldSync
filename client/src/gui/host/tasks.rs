@@ -1,5 +1,5 @@
 use crate::gui::RpcConn;
-use protocol::tarpc;
+use shared::tarpc;
 pub use protocol::{ServiceClient, HostId};
 pub use tarpc::context;
 

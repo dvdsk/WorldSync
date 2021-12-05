@@ -127,7 +127,7 @@ impl Page {
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         let inputs = &mut self.inputs;
-        match dbg!(event) {
+        match event {
             Event::Servername(s) => {
                 inputs.server.value = s;
                 inputs.server.style = style::Input::Ok;

@@ -9,7 +9,8 @@ use tokio::sync::broadcast;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use protocol::{tarpc, Service, UserId};
+use shared::tarpc;
+use protocol::{Service, UserId};
 use tarpc::server::{incoming::Incoming, Channel};
 use tarpc::tokio_serde::formats::Json;
 use uuid::Uuid;

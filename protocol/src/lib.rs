@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use sync::{DirContent, DirUpdate, ObjectId};
 
 use serde::{Deserialize, Serialize};
+use shared::tarpc;
 pub use time;
-pub use tarpc;
 pub use uuid::Uuid;
 
 #[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]

@@ -1,9 +1,9 @@
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
 use protocol::ServiceClient;
-use protocol::tarpc;
-use protocol::tarpc::client::Config;
-use protocol::tarpc::tokio_serde::formats::Json;
+use shared::tarpc;
+use shared::tarpc::client::Config;
+use shared::tarpc::tokio_serde::formats::Json;
 use tokio::net::TcpStream;
 use tokio::time::sleep;
 

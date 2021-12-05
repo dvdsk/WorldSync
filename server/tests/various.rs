@@ -1,5 +1,5 @@
 mod util;
-use protocol::tarpc::context;
+use shared::tarpc::context;
 use util::{free_port, test_conn, test_server};
 
 async fn version(port: u16) -> protocol::Version {

@@ -4,8 +4,8 @@ use std::path::Path;
 
 use crate::gui::host::Event as hEvent;
 use futures::stream::{self, BoxStream};
-use protocol::tarpc::client::RpcError;
-use protocol::tarpc::context;
+use shared::tarpc::client::RpcError;
+use shared::tarpc::context;
 use sync::{DirContent, DirUpdate, ObjectId, SyncAction};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -176,6 +176,7 @@ impl State {
     }
 }
 
+#[instrument(err)]
 async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Error> {
     match action {
         SyncAction::Remove(path) => fs::remove_file(path).await?,
@@ -197,10 +198,11 @@ async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Erro
     Ok(())
 }
 
+#[instrument(err)]
 async fn download_obj(conn: &mut RpcConn, id: ObjectId) -> Result<Vec<u8>, Error> {
     let bytes = conn
         .client
-        .get_object(context::current(), conn.session, id)
+        .get_object(crate::context(2 * 60), conn.session, id)
         .await??;
     Ok(bytes)
 }
