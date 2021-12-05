@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+	"shared",
+	"protocol",
+	"sync",
+	"wrapper",
+	"client",
+	"server",
+]
