@@ -44,7 +44,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with: 
         name: ${{ matrix.os }}
-        path: client/target/release/client.exe
+        path: target/release/client.exe
         retention-days: 1
 
     - name: upload other build
@@ -52,7 +52,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with: 
         name: ${{ matrix.os }}
-        path: client/target/release/client
+        path: target/release/client
         retention-days: 1
 
   release:
