@@ -7,6 +7,9 @@ use shared::tarpc;
 pub use time;
 pub use uuid::Uuid;
 
+mod connect;
+pub use connect::connect;
+
 #[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum Error {
     #[error("wrong username or password")]

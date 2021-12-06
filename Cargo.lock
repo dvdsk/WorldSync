@@ -269,14 +269,11 @@ dependencies = [
  "iced_futures",
  "iced_native",
  "protocol",
- "rustls-native-certs",
  "server",
  "shared",
  "sync",
  "thiserror",
  "tokio",
- "tokio-rustls",
- "tokio-util",
  "tracing",
  "tracing-subscriber 0.3.3",
  "wrapper",
@@ -2361,12 +2358,15 @@ name = "protocol"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "rustls-native-certs",
  "serde",
  "shared",
  "sync",
  "thiserror",
  "time",
  "tokio",
+ "tokio-rustls",
+ "tokio-util",
  "uuid",
 ]
 
