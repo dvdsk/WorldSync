@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::time::timeout;
+use tracing::instrument;
 
 pub mod parser;
 
@@ -26,9 +27,10 @@ pub enum Error {
     #[error("No jar file 'server.jar' found at: {0}")]
     NoJar(PathBuf),
     #[error("Java version outdated")]
-    OutdatedJava{required: String}
+    OutdatedJava { required: String },
 }
 
+#[derive(Debug)]
 pub struct Instance {
     process: Child,
     working_dir: PathBuf,
@@ -52,6 +54,11 @@ impl Instance {
         server_path: impl AsRef<Path>,
         mem_size: u8,
     ) -> Result<(Self, Handle), Error> {
+        Self::start_instance(server_path.as_ref(), mem_size).await
+    }
+
+    #[instrument(err)]
+    async fn start_instance(server_path: &Path, mem_size: u8) -> Result<(Self, Handle), Error> {
         let working_dir = tokio::fs::canonicalize(server_path)
             .await
             .map_err(|_| Error::IncorrectServerPath)?;
@@ -85,6 +92,7 @@ impl Instance {
         Ok((instance, handle))
     }
 
+    #[instrument(err)]
     pub async fn next_event(&mut self) -> Result<parser::Line, Error> {
         loop {
             tokio::select! {
@@ -128,16 +136,14 @@ async fn collect_lines(stderr: &mut Lines<BufReader<ChildStderr>>, lines: &mut S
     }
 }
 
-async fn handle_stderr(line: String, instance: &mut Instance) -> Error  {
+async fn handle_stderr(line: String, instance: &mut Instance) -> Error {
     // output is probably multiline, try to collect a few more lines
     let mut lines = line;
     let collect = collect_lines(&mut instance.stderr, &mut lines);
     timeout(Duration::from_millis(10), collect).await.unwrap();
 
     match lines.lines().next().unwrap() {
-        "Error: Unable to access jarfile server.jar" => {
-            Error::NoJar(instance.working_dir.clone())
-        }
+        "Error: Unable to access jarfile server.jar" => Error::NoJar(instance.working_dir.clone()),
         "Error: LinkageError occurred while loading main class net.minecraft.bundler.Main" => {
             outdated_java_error(&lines)
         }
@@ -151,7 +157,7 @@ pub fn outdated_java_error(lines: &String) -> Error {
     let start = lines.find("class file version ").unwrap();
     let stop = start + lines[start..].find(')').unwrap();
     let required = lines[start..stop].to_owned();
-    Error::OutdatedJava{required}
+    Error::OutdatedJava { required }
 }
 
 impl std::fmt::Debug for Handle {

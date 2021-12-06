@@ -36,15 +36,5 @@ jobs:
           **/target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Test client
-      working-directory: ./client
-      run: cargo test
-    - name: Test wrapper
-      working-directory: ./wrapper
-      run: cargo test
-    - name: Test sync
-      working-directory: ./sync
-      run: cargo test
-    - name: Test server
-      working-directory: ./server
+    - name: Test
       run: cargo test

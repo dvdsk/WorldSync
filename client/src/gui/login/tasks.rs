@@ -22,7 +22,7 @@ pub async fn login(
     username: String,
     password: String,
 ) -> Result<(RpcConn, Option<Host>), Error> {
-    let client = crate::connect(&domain, port)
+    let client = protocol::connect(&domain, port)
         .await
         .map_err(|_| Error::NoMetaConn)?;
     let session = client

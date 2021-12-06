@@ -114,12 +114,18 @@ pub struct FileStatus {
 }
 
 impl FileStatus {
-    async fn new(path: PathBuf) -> Result<FileStatus, Error> {
+    #[instrument(err)]
+    async fn new(path: PathBuf, base: PathBuf) -> Result<FileStatus, Error> {
         let mut file = File::open(&path).await?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes).await?;
 
         let hash = task::spawn_blocking(move || seahash::hash(&bytes));
+        let path = path
+            .strip_prefix(base)
+            .map(|p| p.to_owned())
+            .unwrap_or(path);
+
         Ok(FileStatus {
             hash: hash.await.expect("error joining hash task"),
             path,
@@ -128,7 +134,6 @@ impl FileStatus {
 }
 
 impl DirContent {
-    #[instrument(err)]
     fn build_file_list(dir: &Path) -> Result<Vec<PathBuf>, Error> {
         let mut paths = Vec::new();
         for res in WalkDir::new(dir) {
@@ -136,11 +141,7 @@ impl DirContent {
             if entry.file_type().is_dir() {
                 continue;
             }
-
-            let path = match dir.parent() {
-                Some(base) => entry.into_path().strip_prefix(base).unwrap().to_owned(),
-                None => entry.into_path(),
-            };
+            let path = entry.into_path();
             paths.push(path);
         }
         Ok(paths)
@@ -148,15 +149,19 @@ impl DirContent {
 
     #[instrument(err)]
     pub async fn from_path(path: PathBuf) -> Result<Self, Error> {
+        let base = path.parent().unwrap_or(Path::new("")).to_owned();
         let paths = task::spawn_blocking(move || Self::build_file_list(&path))
             .await
             .expect("error joining dirwalker task");
 
-        DirContent::from_file_list(paths?).await
+        DirContent::from_file_list(paths?, &base).await
     }
 
-    pub async fn from_file_list(paths: Vec<PathBuf>) -> Result<Self, Error> {
-        let make_filecheck = paths.into_iter().map(FileStatus::new);
+    #[instrument(err)]
+    pub async fn from_file_list(paths: Vec<PathBuf>, base: &Path) -> Result<Self, Error> {
+        let make_filecheck = paths
+            .into_iter()
+            .map(|p| FileStatus::new(p, base.to_owned()));
         let results = join_all(make_filecheck).await;
         let results: Result<_, _> = results.into_iter().collect();
         let checks = results?;
