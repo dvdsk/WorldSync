@@ -61,15 +61,16 @@ jobs:
     steps:
     - name: download binaries
       uses: actions/download-artifact@v2
-    - name: display files
-      run: ls -la
     - name: rename binaries
       run: |
         mv windows-latest/client.exe client-win.exe
         mv macos-latest/client client-macos
         mv ubuntu-latest/client client-linux
-    - name: display files
-      run: ls -la
+    - name: Tag commit
+      uses: tvdias/github-tagger@v0.0.1
+      with:
+        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+        tag: "nightly"
     - name: release
       uses: softprops/action-gh-release@v1
       with:
