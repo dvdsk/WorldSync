@@ -37,8 +37,7 @@ jobs:
         key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
     - name: build client
-      working-directory: ./client
-      run: cargo build --release --features deployed
+      run: cargo build --package client --release --features deployed
 
     - name: upload windows build
       if: matrix.os == 'windows-latest'
