@@ -59,9 +59,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: Actions-R-Us/actions-tagger@latest
+      - name: Tag Repo
+        uses: richardsimko/update-tag@v1
         with:
-          publish_latest_tag: true
+          tag_name: nightly
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     runs-on: ubuntu-latest
