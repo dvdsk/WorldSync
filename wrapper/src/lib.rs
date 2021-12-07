@@ -1,12 +1,12 @@
+use derivative::Derivative;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
-use derivative::Derivative;
 use tokio::io::{AsyncBufReadExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::time::timeout;
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 pub mod parser;
 
@@ -21,8 +21,6 @@ pub enum Error {
         component in path is not a directory"
     )]
     IncorrectServerPath,
-    #[error("Could not parse minecraft server output: {0}")]
-    Parser(#[from] parser::Error),
     #[error("Unknown error, multi line msg might be truncated: {0}")]
     Unknown(String),
     #[error("No jar file 'server.jar' found at: {0}")]
@@ -102,7 +100,10 @@ impl Instance {
                 res = self.stdout.next_line() => {
                     match res {
                         Err(e) => return Err(Error::Pipe(e.kind())),
-                        Ok(Some(line)) => return handle_stdout(line),
+                        Ok(Some(line)) => match parser::parse(line) {
+                            Ok(line) => return Ok(line),
+                            Err(e) => {debug!("{:?}", e); continue}
+                }
                         Ok(None) => continue,
                     }
                 }
@@ -126,10 +127,6 @@ async fn wait_for<T>(source: &mut Option<T>) -> T {
         }
         sleep(Duration::from_millis(50)).await;
     }
-}
-
-fn handle_stdout(line: String) -> Result<parser::Line, Error> {
-    parser::parse(line).map_err(|e| e.into())
 }
 
 async fn collect_lines(stderr: &mut Lines<BufReader<ChildStderr>>, lines: &mut String) {

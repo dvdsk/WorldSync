@@ -185,13 +185,13 @@ fn local_path(remote_path: PathBuf) -> PathBuf {
 #[instrument(err)]
 async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Error> {
     match action {
-        SyncAction::Remove(path) => fs::remove_file(path).await?,
+        SyncAction::Remove(path) => fs::remove_file(local_path(path)).await?,
         SyncAction::Replace(path, id) => {
             let bytes = download_obj(conn, id).await?;
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .truncate(true)
-                .open(dbg!(local_path(path)))
+                .open(local_path(path))
                 .await?;
             file.write_all(&bytes).await?;
         }
@@ -200,7 +200,7 @@ async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Erro
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
-                .open(dbg!(local_path(path)))
+                .open(local_path(path))
                 .await?;
             file.write_all(&bytes).await?;
         }

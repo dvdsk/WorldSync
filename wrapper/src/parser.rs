@@ -11,7 +11,7 @@ use time::Time;
 #[derive(thiserror::Error, Derivative, Debug, Clone, PartialEq, Eq)]
 #[derivative(Hash)]
 pub enum Error {
-    #[error("Could not parse minecraft server output")]
+    #[error("Could not parse minecraft server output, line: {line}, error: {error}")]
     ParsingError{line: String, #[derivative(Hash="ignore")] error: ParseError<LineCol>},
 }
 
@@ -77,6 +77,8 @@ pub enum Message {
     Other(String),
 }
 
+/// Incomplete parser, will return Error on non matching lines, these should be 
+/// logged or discarded by the caller
 pub fn parse(input: impl Into<String> + AsRef<str>) -> Result<Line, Error> {
     line_parser::line(input.as_ref())
         .map_err(|error| Error::ParsingError{line: input.into(), error})

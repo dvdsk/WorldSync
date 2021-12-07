@@ -80,7 +80,7 @@ impl Loading {
         use Loading::*;
         match self {
             NotStarted => Space::with_height(Length::FillPortion(1)).into(),
-            InProgress{range, value} => ProgressBar::new(range.clone(), dbg!(*value)).into(),
+            InProgress{range, value} => ProgressBar::new(range.clone(), *value).into(),
         }
     }
 }
