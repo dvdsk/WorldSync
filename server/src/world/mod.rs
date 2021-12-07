@@ -64,15 +64,19 @@ impl World {
         Ok(())
     }
 
-    pub async fn load_save(&self, source: PathBuf) -> Result<(), protocol::Error> {
+    pub async fn set_save(&self, source: PathBuf) -> Result<(), protocol::Error> {
         if self.host().is_some() {
             return Err(protocol::Error::SaveInUse);
         }
 
-        let content = DirContent::from_path(source.clone()).await.unwrap();
+        let content = DirContent::from_dir(source.clone()).await.unwrap();
+        dbg!(&content);
         let (new_save, update_list) = UpdateList::for_new_save(&self.db, content);
+        dbg!(&update_list);
+        dbg!(&new_save);
         for (object_id, path) in update_list.0 {
-            let bytes = tokio::fs::read(path).await.unwrap();
+            let full_path = source.join(path);
+            let bytes = tokio::fs::read(full_path).await.unwrap();
             WorldDb::add_obj(object_id, &bytes).await?;
         }
         self.db.push_save(new_save);

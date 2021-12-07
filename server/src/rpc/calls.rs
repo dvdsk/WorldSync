@@ -243,7 +243,7 @@ impl Service for ConnState {
             return Err(Error::DirDoesNotExist);
         }
 
-        self.world.load_save(dir.clone()).await?;
+        self.world.set_save(dir.clone()).await?;
         info!("set save to whatever was in: {:?}", dir);
         Ok(())
     }

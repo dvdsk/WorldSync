@@ -13,7 +13,7 @@ async fn empty_dir() {
         .create("test_data/empty_dir")
         .unwrap();
 
-    let dir_status = DirContent::from_path(PathBuf::from("test_data/empty_dir"))
+    let dir_status = DirContent::from_dir(PathBuf::from("test_data/empty_dir"))
         .await
         .unwrap();
     assert_eq!(dir_status, DirContent(Vec::new()))
@@ -38,7 +38,7 @@ async fn dir_with_files() {
         file.write_all(b"Hello, world!").unwrap();
     }
 
-    let mut dir_status = DirContent::from_path(PathBuf::from("test_data/dir_with_files"))
+    let mut dir_status = DirContent::from_dir(PathBuf::from("test_data/dir_with_files"))
         .await
         .unwrap();
 

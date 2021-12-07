@@ -93,7 +93,7 @@ pub enum SyncAction {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ObjectId(pub u64);
-/// list of the paths on the remote that need to be uploaded
+/// list of (relative) paths on the remote that need to be uploaded
 /// and the objectid they should be assigned
 #[derive(Debug, Clone)]
 pub struct UpdateList(pub Vec<(ObjectId, PathBuf)>);
@@ -109,6 +109,7 @@ pub struct DirContent(pub Vec<FileStatus>);
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileStatus {
+    /// relative path
     pub path: PathBuf,
     pub hash: u64,
 }
@@ -148,13 +149,13 @@ impl DirContent {
     }
 
     #[instrument(err)]
-    pub async fn from_path(path: PathBuf) -> Result<Self, Error> {
-        let base = path.parent().unwrap_or(Path::new("")).to_owned();
-        let paths = task::spawn_blocking(move || Self::build_file_list(&path))
+    pub async fn from_dir(dir: PathBuf) -> Result<Self, Error> {
+        let dir_clone = dir.clone();
+        let paths = task::spawn_blocking(move || Self::build_file_list(&dir_clone))
             .await
             .expect("error joining dirwalker task");
 
-        DirContent::from_file_list(paths?, &base).await
+        DirContent::from_file_list(paths?, &dir).await
     }
 
     #[instrument(err)]

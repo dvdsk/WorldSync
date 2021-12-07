@@ -1,6 +1,6 @@
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::gui::host::Event as hEvent;
 use futures::stream::{self, BoxStream};
@@ -65,7 +65,7 @@ impl From<sync::Error> for Error {
 }
 
 impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Self {
+    fn from(e: std::io::Error) -> Self {
         Error::FsError
     }
 }
@@ -109,7 +109,7 @@ impl State {
             info!("created directory for server in: {:?}", full_path);
             fs::create_dir(SERVER_PATH).await.unwrap();
         }
-        let dir_content = DirContent::from_path(SERVER_PATH.into()).await?;
+        let dir_content = DirContent::from_dir(SERVER_PATH.into()).await?;
         let dir_update = self
             .conn
             .client
@@ -178,6 +178,10 @@ impl State {
     }
 }
 
+fn local_path(remote_path: PathBuf) -> PathBuf {
+    Path::new(SERVER_PATH).join(remote_path)
+}
+
 #[instrument(err)]
 async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Error> {
     match action {
@@ -185,15 +189,19 @@ async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Erro
         SyncAction::Replace(path, id) => {
             let bytes = download_obj(conn, id).await?;
             let mut file = fs::OpenOptions::new()
-                .truncate(true)
                 .write(true)
-                .open(path)
+                .truncate(true)
+                .open(dbg!(local_path(path)))
                 .await?;
             file.write_all(&bytes).await?;
         }
         SyncAction::Add(path, id) => {
             let bytes = download_obj(conn, id).await?;
-            let mut file = fs::OpenOptions::new().create_new(true).open(path).await?;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(dbg!(local_path(path)))
+                .await?;
             file.write_all(&bytes).await?;
         }
     }
