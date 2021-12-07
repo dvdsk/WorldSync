@@ -1,13 +1,18 @@
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
+use peg::error::ParseError;
+use peg::str::LineCol;
 use serde::{Deserialize, Serialize};
+use derivative::Derivative;
 use time::Time;
 
-#[derive(thiserror::Error, Debug, Clone, Hash, PartialEq, Eq)]
+
+#[derive(thiserror::Error, Derivative, Debug, Clone, PartialEq, Eq)]
+#[derivative(Hash)]
 pub enum Error {
     #[error("Could not parse minecraft server output")]
-    ParsingError,
+    ParsingError{line: String, #[derivative(Hash="ignore")] error: ParseError<LineCol>},
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -73,7 +78,8 @@ pub enum Message {
 }
 
 pub fn parse(input: impl Into<String> + AsRef<str>) -> Result<Line, Error> {
-    line_parser::line(input.as_ref()).map_err(|_| Error::ParsingError)
+    line_parser::line(input.as_ref())
+        .map_err(|error| Error::ParsingError{line: input.into(), error})
 }
 
 peg::parser! {
