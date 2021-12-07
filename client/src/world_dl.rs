@@ -136,6 +136,7 @@ impl State {
     }
 
     // TODO improve, spawn a few tasks and run request concurrently
+    // TODO clean up empty folders
     async fn apply_updates(self) -> (Event, Self) {
         let Self {
             mut conn,
@@ -178,29 +179,32 @@ impl State {
     }
 }
 
-fn local_path(remote_path: PathBuf) -> PathBuf {
-    Path::new(SERVER_PATH).join(remote_path)
+fn local_path(remote_path: &Path) -> PathBuf {
+    dbg!(Path::new(SERVER_PATH).join(remote_path))
 }
 
 #[instrument(err)]
 async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Error> {
     match action {
-        SyncAction::Remove(path) => fs::remove_file(local_path(path)).await?,
+        SyncAction::Remove(path) => {
+            fs::remove_file(local_path(&path)).await?;
+        }
         SyncAction::Replace(path, id) => {
             let bytes = download_obj(conn, id).await?;
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .truncate(true)
-                .open(local_path(path))
+                .open(local_path(&path))
                 .await?;
             file.write_all(&bytes).await?;
         }
         SyncAction::Add(path, id) => {
             let bytes = download_obj(conn, id).await?;
+            fs::create_dir_all(local_path(&path)).await?;
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
-                .open(local_path(path))
+                .open(local_path(&path))
                 .await?;
             file.write_all(&bytes).await?;
         }
