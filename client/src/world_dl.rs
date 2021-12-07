@@ -14,6 +14,8 @@ use tracing::{error, info, instrument};
 use crate::gui::RpcConn;
 use crate::Event;
 
+pub const SERVER_PATH: &str = "server";
+
 pub fn sub(conn: RpcConn, count: usize) -> iced::Subscription<Event> {
     iced::Subscription::from_recipe(WorldDl {
         conn: Cell::new(Some(conn)),
@@ -102,12 +104,12 @@ use crate::gui::host;
 impl State {
     #[instrument(err)]
     async fn get_dir_update(&mut self) -> Result<DirUpdate, Error> {
-        if !Path::new("server").is_dir() {
-            let full_path = fs::canonicalize("server").await.unwrap();
+        if !Path::new(SERVER_PATH).is_dir() {
+            let full_path = fs::canonicalize(SERVER_PATH).await.unwrap();
             info!("created directory for server in: {:?}", full_path);
-            fs::create_dir("server").await.unwrap();
+            fs::create_dir(SERVER_PATH).await.unwrap();
         }
-        let dir_content = DirContent::from_path("server".into()).await?;
+        let dir_content = DirContent::from_path(SERVER_PATH.into()).await?;
         let dir_update = self
             .conn
             .client

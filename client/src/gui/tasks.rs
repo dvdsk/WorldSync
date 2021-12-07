@@ -1,9 +1,9 @@
-use super::State;
+use super::{RpcConn, State};
 
 #[derive(Default, Clone)]
 pub struct SubStatus {
     id: usize,
-    active: bool
+    active: bool,
 }
 
 impl SubStatus {
@@ -24,7 +24,8 @@ impl SubStatus {
     }
 }
 
-
 impl State {
-    
+    pub fn unwrap_rpc(&self) -> RpcConn {
+        self.rpc.as_ref().unwrap().clone()
+    }
 }

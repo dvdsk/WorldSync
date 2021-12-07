@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use sync::{DirContent, DirUpdate, ObjectId};
+use wrapper::parser::Line;
 
 use serde::{Deserialize, Serialize};
 use shared::tarpc;
@@ -36,11 +37,16 @@ pub enum Error {
     DirDoesNotExist,
     #[error("could not load save, someone is currently hosting")]
     SaveInUse,
+    #[error("could not dump save, folder is not empty")]
+    NotEmpty,
+    #[error("session is not currently hosting")]
+    NotHost,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
     HostLoading(u8),
+    HostLoaded,
     #[cfg(not(feature = "deployed"))]
     TestHB(usize),
     NewHost(Host),
@@ -105,6 +111,7 @@ pub trait Service {
     async fn request_to_host(id: SessionId, host_id: HostId) -> Result<(), Error>;
     async fn dir_update(id: SessionId, dir: DirContent) -> Result<DirUpdate, Error>;
     async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
+    async fn pub_mc_line(id: HostId, line: Line) -> Result<(), Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
     async fn list_users() -> Result<Vec<(UserId, User)>, Error>;

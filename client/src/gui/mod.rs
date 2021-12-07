@@ -1,4 +1,4 @@
-use crate::{events, world_dl, mc, Event};
+use crate::{events, mc, world_dl, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{ServiceClient, Uuid};
@@ -52,6 +52,7 @@ impl State {
     }
 }
 
+#[derive(PartialEq)]
 enum Page {
     Login,
     Hosting,
@@ -80,10 +81,12 @@ impl Application for State {
         use protocol::Event::*;
         use Event::*;
 
-        match dbg!(message) {
+        match message {
             LoginPage(event) => return self.login.update(event),
-            HostPage(event) => return self.can_host.update(event, &mut self.rpc),
-            HostingPage(event) => return self.hosting.update(event),
+            HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
+            HostingPage(event) => {
+                return self.hosting.update(event, self.unwrap_rpc())
+            }
             LoggedIn(rpc, host) => {
                 self.server_events = true;
                 match host {
@@ -101,9 +104,15 @@ impl Application for State {
             }
             WorldUpdated => {
                 self.mc_server.start();
-                self.can_host.update(host::Event::WorldUpdated, &mut self.rpc);
+                self.can_host
+                    .update(host::Event::WorldUpdated, self.unwrap_rpc());
             }
-            ServerStarted => {
+            Server(HostLoading(p)) => {
+                return self
+                    .can_host
+                    .update(host::Event::Loading(p), self.unwrap_rpc())
+            }
+            Server(HostLoaded) => {
                 self.page = Page::Hosting;
             }
             Server(NewHost(host)) if self.can_host.is_us(&host) => {
@@ -118,7 +127,6 @@ impl Application for State {
             Server(TestHB(n)) => info!("recieved hb {}", n),
             Error(e) => panic!("tmp error remove {:?}", e),
             Empty => (),
-            _e => todo!("handle: {:?}", _e),
         }
         Command::none()
     }

@@ -2368,6 +2368,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "uuid",
+ "wrapper",
 ]
 
 [[package]]
@@ -2789,6 +2790,7 @@ dependencies = [
  "tracing-subscriber 0.3.3",
  "typed-sled",
  "uuid",
+ "wrapper",
 ]
 
 [[package]]
@@ -3923,8 +3925,10 @@ dependencies = [
 name = "wrapper"
 version = "0.1.0"
 dependencies = [
+ "derivative",
  "peg",
  "reqwest",
+ "serde",
  "thiserror",
  "time",
  "tokio",

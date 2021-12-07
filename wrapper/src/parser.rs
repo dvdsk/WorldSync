@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
+use serde::{Deserialize, Serialize};
 use time::Time;
 
 #[derive(thiserror::Error, Debug, Clone, Hash, PartialEq, Eq)]
@@ -9,7 +10,7 @@ pub enum Error {
     ParsingError,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Line {
     pub time: Time,
     pub source: String,
@@ -17,21 +18,21 @@ pub struct Line {
     pub msg: Message,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Level {
     Info,
     Warn,
     Error,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Coords {
     pub x: f32,
     pub y: f32,
     pub z: f32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Exception {
     AddressInUse,
     Unknown(String),
@@ -39,7 +40,7 @@ pub enum Exception {
 
 /// only minecraft version numbers post 1.0.0 are supported
 /// versions earlier then 1.14 will end up as unknown
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Version {
     Pre(u8, u8, u8),
     ExpSnapshot(u8, u8, u8),
@@ -50,7 +51,7 @@ pub enum Version {
     Unknown,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Message {
     EulaUnaccepted,
     Joined {

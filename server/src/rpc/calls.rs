@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::db::world::WorldDb;
 use sync::{DirContent, DirUpdate, ObjectId};
+use wrapper::parser::Line;
 
 use super::ConnState;
 use shared::tarpc;
@@ -147,6 +148,15 @@ impl Service for ConnState {
         Ok(WorldDb::get_object(object).await?)
     }
 
+    async fn pub_mc_line(self, _: context::Context, id: HostId, line: Line) -> Result<(), Error> {
+        if self.world.host().map(|h| h.id) != Some(id) {
+            return Err(Error::NotHost);
+        }
+
+        crate::handle_line(line, self.events.clone());
+        Ok(())
+    }
+
     async fn add_user(
         mut self,
         _: context::Context,
@@ -219,7 +229,8 @@ impl Service for ConnState {
             return Err(Error::DirDoesNotExist);
         }
 
-        self.world.dump_save(dir).await;
+        self.world.dump_save(dir.clone()).await?;
+        info!("dumped last save into: {:?}", dir);
         Ok(())
     }
 

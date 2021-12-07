@@ -2,6 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
+use derivative::Derivative;
 use tokio::io::{AsyncBufReadExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::time::timeout;
@@ -30,8 +31,10 @@ pub enum Error {
     OutdatedJava { required: String },
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Instance {
+    #[derivative(Debug = "ignore")]
     process: Child,
     working_dir: PathBuf,
     stdout: Lines<BufReader<ChildStdout>>,

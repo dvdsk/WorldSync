@@ -5,12 +5,12 @@ use std::time::Instant;
 
 use protocol::SessionId;
 use sync::{DirContent, DirUpdate, UpdateList};
-use tracing::info;
+use tracing::{info, instrument};
 use typed_sled::sled;
 
 use crate::db::world::WorldDb;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct World {
     state: Arc<RwLock<State>>,
     db: WorldDb,
@@ -37,7 +37,21 @@ impl World {
         self.db.get_update_list(dir)
     }
 
-    pub async fn dump_save(&self, target: PathBuf) {
+    #[instrument(err)]
+    pub async fn dump_save(&self, target: PathBuf) -> Result<(), protocol::Error> {
+        let is_empty = tokio::fs::read_dir(&target)
+            .await
+            .expect("could not check save dump content")
+            .next_entry()
+            .await
+            .unwrap()
+            .is_none();
+
+        if !is_empty {
+            return Err(protocol::Error::NotEmpty)
+        }
+
+
         let save = self.db.last_save();
         for sync::Object{org_path, id, ..} in save.objects() {
             let mut source = WorldDb::obj_path().to_owned();
@@ -47,6 +61,7 @@ impl World {
             tokio::fs::copy(source, target).await.unwrap();
         }
         info!("dumped save to: {:?}", target);
+        Ok(())
     }
 
     pub async fn load_save(&self, source: PathBuf) -> Result<(), protocol::Error> {
@@ -54,25 +69,27 @@ impl World {
             return Err(protocol::Error::SaveInUse);
         }
 
-        let content = DirContent::from_path(source).await.unwrap();
+        let content = DirContent::from_path(source.clone()).await.unwrap();
         let (new_save, update_list) = UpdateList::for_new_save(&self.db, content);
         for (object_id, path) in update_list.0 {
             let bytes = tokio::fs::read(path).await.unwrap();
             WorldDb::add_obj(object_id, &bytes).await?;
         }
         self.db.push_save(new_save);
+        info!("loaded and set save from: {:?}", source);
 
         Ok(())
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Host {
     last_hb: Instant,
     addr: SocketAddr,
     session_id: SessionId,
 }
 
+#[derive(Debug)]
 pub struct State {
     host: Option<Host>,
 }

@@ -6,6 +6,7 @@ use futures::stream::{self, BoxStream};
 use tracing::info;
 use wrapper::Instance;
 
+use crate::world_dl::SERVER_PATH;
 use crate::Event;
 
 // pub mod server;
@@ -50,7 +51,7 @@ where
 
 async fn start(mut state: State) -> (Event, State) {
     info!("starting minecraft server");
-    match Instance::start(Path::new("tests/data"), 2).await {
+    match Instance::start(Path::new(SERVER_PATH), 2).await {
         Err(e) => {
             use crate::gui::host::Event as hEvent;
             let event = Event::HostPage(hEvent::Error(e.into()));
@@ -68,10 +69,21 @@ async fn start(mut state: State) -> (Event, State) {
     }
 }
 
+async fn forward_events(mut state: State) -> (Event, State) {
+    use crate::gui::hosting::Error as hError;
+    use crate::gui::hosting::Event as hEvent;
+    let res = state.instance.as_mut().unwrap().next_event().await;
+    let event = match res {
+        Ok(event) => hEvent::Mc(event),
+        Err(err) => hEvent::Error(hError::Mc(err)),
+    };
+    (Event::HostingPage(event), state)
+}
+
 async fn state_machine(state: State) -> Option<(Event, State)> {
     match state.phase {
         Phase::Start => Some(start(state).await),
-        Phase::Running => todo!(),
+        Phase::Running => Some(forward_events(state).await),
         Phase::Error => None,
     }
 }

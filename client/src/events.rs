@@ -12,12 +12,10 @@ use std::time::{Duration, SystemTime};
 pub enum Event {
     LoggedIn(RpcConn, Option<Host>),
     WorldUpdated,
-    ServerStarted,
     HostPage(host::Event),
     LoginPage(login::Event),
     HostingPage(hosting::Event),
     Server(protocol::Event),
-    McServer,
     Error(Error),
     Empty,
 }

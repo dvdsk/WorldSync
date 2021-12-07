@@ -2,12 +2,17 @@ use std::sync::Arc;
 
 use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
 pub use crate::Event as Msg;
+use super::RpcConn;
 use super::parts::{ClearError, ErrorBar};
 
 mod tasks;
 
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Error {
+    #[error("Ran into problem running minecraft server: {0}")]
+    Mc(wrapper::Error),
+    #[error("No longer the host")]
+    NotHost,
 }
 
 impl From<protocol::Error> for Error {
@@ -20,6 +25,7 @@ impl From<protocol::Error> for Error {
 pub enum Event {
     ClearError(Error),
     Handle(Arc<wrapper::Handle>),
+    Mc(wrapper::parser::Line),
     Error(Error),
 }
 
@@ -41,14 +47,15 @@ impl Page {
         Self::default()
     }
 
-    pub fn update(&mut self, event: Event) -> Command<Msg> {
-        match dbg!(event) {
+    pub fn update(&mut self, event: Event, rpc: RpcConn) -> Command<Msg> {
+        match event {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::Handle(h) => {
                 let h = Arc::try_unwrap(h).expect("could not get ownership over server handle");
                 self.server = Some(h);
             }
+            Event::Mc(line) => return Self::send_line(line, rpc),
         }
         Command::none()
     }

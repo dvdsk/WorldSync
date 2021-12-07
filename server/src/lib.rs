@@ -7,10 +7,11 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use tokio::sync::broadcast;
 use tokio::sync::Mutex;
+use tracing::debug;
 use tracing::info;
 
-use shared::tarpc;
 use protocol::{Service, UserId};
+use shared::tarpc;
 use tarpc::server::{incoming::Incoming, Channel};
 use tarpc::tokio_serde::formats::Bincode;
 use uuid::Uuid;
@@ -33,7 +34,7 @@ pub struct Session {
 pub struct Sessions {
     by_id: Arc<RwLock<HashMap<SessionId, Session>>>,
 }
-//let (event_tx, _) = broadcast::channel(100);
+
 impl Sessions {
     fn add(&mut self, user_id: UserId, backlog: broadcast::Receiver<Event>) -> SessionId {
         let uuid = Uuid::new_v4();
@@ -113,4 +114,18 @@ pub async fn host(
         .buffer_unordered(10)
         .for_each(|_| async {})
         .await;
+}
+
+use wrapper::parser::Line;
+pub fn handle_line(line: Line, events: Arc<broadcast::Sender<Event>>) {
+    use wrapper::parser::Message;
+    match line.msg {
+        Message::Loading(p) => {
+            let _ignore_err = events.send(protocol::Event::HostLoading(p));
+        }
+        Message::DoneLoading(_) => {
+            let _ignore_err = events.send(protocol::Event::HostLoaded);
+        }
+        m => debug!("unhandled mc msg: {:?}", m),
+    }
 }

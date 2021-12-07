@@ -34,6 +34,7 @@ pub enum Event {
     WantToHost,
     ObjToSync{left: usize},
     DlStarting{num_obj: usize},
+    Loading(u8),
     WorldUpdated,
 }
 
@@ -58,14 +59,15 @@ impl Page {
         Self::default()
     }
 
-    pub fn update(&mut self, event: Event, rpc: &mut Option<RpcConn>) -> Command<Msg> {
-        match dbg!(event) {
+    pub fn update(&mut self, event: Event, rpc: RpcConn) -> Command<Msg> {
+        match event {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::WantToHost => return self.request_to_host(rpc),
             Event::ObjToSync{left} => self.downloading.set_progress(left as f32),
             Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32),
             Event::WorldUpdated => self.downloading.finished(),
+            Event::Loading(p) => self.loading_server.set_progress(p as f32),
         }
         Command::none()
     }
