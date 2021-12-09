@@ -65,7 +65,7 @@ impl From<sync::Error> for Error {
 }
 
 impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
+    fn from(_: std::io::Error) -> Self {
         Error::FsError
     }
 }
@@ -180,7 +180,7 @@ impl State {
 }
 
 fn local_path(remote_path: &Path) -> PathBuf {
-    dbg!(Path::new(SERVER_PATH).join(remote_path))
+    Path::new(SERVER_PATH).join(remote_path)
 }
 
 #[instrument(err)]
@@ -200,7 +200,14 @@ async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Erro
         }
         SyncAction::Add(path, id) => {
             let bytes = download_obj(conn, id).await?;
-            fs::create_dir_all(local_path(&path)).await?;
+            if let Some(dir) = local_path(&path).parent(){
+                fs::create_dir_all(dir).await?;
+            }
+            if local_path(&path).is_dir() {
+                // take care never to remove the local_path() call
+                // this removes any files inside the path
+                fs::remove_dir_all(local_path(&path)).await?;
+            }
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
