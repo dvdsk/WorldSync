@@ -7,6 +7,7 @@ pub struct SubStatus {
 }
 
 impl SubStatus {
+    #[allow(dead_code)]
     pub fn stop(&mut self) {
         assert!(self.active, "subscription was not active");
         self.active = false;

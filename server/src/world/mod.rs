@@ -21,15 +21,15 @@ impl World {
         let state = self.state.read().unwrap();
         state.host()
     }
-    pub fn set_host(&self, addr: SocketAddr, session_id: SessionId) -> bool {
+    pub fn set_host(&self, addr: SocketAddr, session_id: SessionId, name: String) -> bool {
         let mut state = self.state.write().unwrap();
-        state.set_host(addr, session_id)
+        state.set_host(addr, session_id, name)
     }
 
     pub async fn from(db: sled::Db) -> Self {
         Self {
             state: Arc::new(RwLock::new(State { host: None })),
-            db: WorldDb::from(db).await, 
+            db: WorldDb::from(db).await,
         }
     }
 
@@ -48,12 +48,11 @@ impl World {
             .is_none();
 
         if !is_empty {
-            return Err(protocol::Error::NotEmpty)
+            return Err(protocol::Error::NotEmpty);
         }
 
-
         let save = self.db.last_save();
-        for sync::Object{org_path, id, ..} in save.objects() {
+        for sync::Object { org_path, id, .. } in save.objects() {
             let mut source = WorldDb::obj_path().to_owned();
             source.push(id.0.to_string());
             let mut target = target.clone();
@@ -88,6 +87,7 @@ impl World {
 
 #[derive(Debug, Clone)]
 pub struct Host {
+    name: String,
     last_hb: Instant,
     addr: SocketAddr,
     session_id: SessionId,
@@ -100,14 +100,21 @@ pub struct State {
 
 impl State {
     pub fn host(&self) -> Option<protocol::Host> {
-        self.host.as_ref().map(|h| protocol::Host { addr: h.addr, id: h.session_id })
+        self.host.as_ref().map(|h| protocol::Host {
+            loading: true,
+            reachable: true,
+            name: h.name.clone(),
+            addr: h.addr,
+            id: h.session_id,
+        })
     }
-    pub fn set_host(&mut self, addr: SocketAddr, session_id: SessionId) -> bool {
+    pub fn set_host(&mut self, addr: SocketAddr, session_id: SessionId, name: String) -> bool {
         if self.host.is_some() {
             return false;
         }
 
         self.host = Some(Host {
+            name,
             last_hb: Instant::now(),
             session_id,
             addr,

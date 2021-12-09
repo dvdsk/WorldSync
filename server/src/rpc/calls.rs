@@ -103,10 +103,14 @@ impl Service for ConnState {
         id: SessionId,
         host_id: HostId,
     ) -> Result<(), Error> {
-        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
-        let host_changed = self.world.set_host(self.peer_addr, id);
+        let user_id = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        let name = self.userdb.get_name(user_id)?.unwrap();
+        let host_changed = self.world.set_host(self.peer_addr, id, name.clone());
         if host_changed {
             let host = Host {
+                name,
+                loading: true,
+                reachable: true,
                 addr: self.peer_addr,
                 id: host_id,
             };

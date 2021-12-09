@@ -58,6 +58,9 @@ pub type SessionId = Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Host {
+    pub name: String,
+    pub loading: bool,
+    pub reachable: bool,
     pub addr: SocketAddr,
     pub id: HostId,
 }

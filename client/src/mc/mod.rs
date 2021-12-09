@@ -74,7 +74,7 @@ async fn forward_events(mut state: State) -> (Event, State) {
     use crate::gui::hosting::Event as hEvent;
     let res = state.instance.as_mut().unwrap().next_event().await;
     let event = match res {
-        Ok(event) => hEvent::Mc(dbg!(event)),
+        Ok(event) => hEvent::Mc(event),
         Err(err) => hEvent::Error(hError::Mc(err)),
     };
     (Event::HostingPage(event), state)

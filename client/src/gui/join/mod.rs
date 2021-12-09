@@ -1,11 +1,14 @@
-use iced::{Command, Element, Text};
 pub use crate::Event as Msg;
+use iced::{
+    button, Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text,
+};
+
+use super::parts::Loading;
 
 mod tasks;
 
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Error {
-}
+pub enum Error {}
 
 impl From<protocol::Error> for Error {
     fn from(e: protocol::Error) -> Self {
@@ -15,25 +18,79 @@ impl From<protocol::Error> for Error {
 
 #[derive(Debug, Clone)]
 pub enum Event {
+    HostLoading(u8),
+    HostLoaded,
 }
 
-#[derive(Default)]
 pub struct Page {
-    pub host: Option<protocol::Host>,
+    pub host: protocol::Host,
+    loading: Option<Loading>,
+    copy: button::State,
 }
 
 impl Page {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn from(host: protocol::Host) -> Self {
+        Self {
+            host,
+            loading: None,
+            copy: button::State::default(),
+        }
     }
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {
-        match dbg!(event) {
+        use Event::*;
+        match event {
+            HostLoading(p) => self
+                .loading
+                .as_mut()
+                .expect("host should have been marked as loading")
+                .set_progress(p as f32),
+            HostLoaded => self.loading = None,
         }
         Command::none()
     }
 
     pub fn view(&mut self) -> Element<Msg> {
-        Element::new(Text::new("unimplemented"))
+        let sidebar = Space::with_width(Length::FillPortion(4));
+        let left_spacer = Space::with_width(Length::FillPortion(1));
+        let top_spacer = Space::with_height(Length::FillPortion(1));
+        let center_column = Column::new()
+            .align_items(Align::Center)
+            .width(Length::FillPortion(8))
+            .push(top_spacer)
+            .push(self.title())
+            .push(copy_button(&mut self.copy));
+
+        let center_column = match &self.loading {
+            Some(bar) => center_column.push(bar.view()),
+            None => center_column,
+        };
+
+        let ui = Row::new()
+            .push(left_spacer)
+            .push(center_column)
+            .push(sidebar);
+
+        Column::new().width(Length::Fill).push(ui).into()
     }
+}
+
+impl Page {
+    fn title(&self) -> Text {
+        let label = match self.host.loading {
+            true => format!("{} is hosting", self.host.name),
+            false => format!("{} started hosting", self.host.name),
+        };
+        Text::new(label)
+            .width(Length::FillPortion(1))
+            .horizontal_alignment(HorizontalAlignment::Center)
+    }
+}
+
+fn copy_button(state: &mut button::State) -> Button<Msg> {
+    Button::new(
+        state,
+        Text::new("Copy Ip").horizontal_alignment(HorizontalAlignment::Center),
+    )
+    .on_press(Msg::ClipHost)
 }

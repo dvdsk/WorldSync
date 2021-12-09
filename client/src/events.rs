@@ -17,6 +17,7 @@ pub enum Event {
     HostingPage(hosting::Event),
     Server(protocol::Event),
     Error(Error),
+    ClipHost,
     Empty,
 }
 

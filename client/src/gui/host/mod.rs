@@ -66,7 +66,10 @@ impl Page {
             Event::WantToHost => return self.request_to_host(rpc),
             Event::ObjToSync{left} => self.downloading.set_progress(left as f32),
             Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32),
-            Event::WorldUpdated => self.downloading.finished(),
+            Event::WorldUpdated => {
+                self.downloading.finished();
+                self.loading_server.start(100.0);
+            }
             Event::Loading(p) => self.loading_server.set_progress(p as f32),
         }
         Command::none()
@@ -76,6 +79,7 @@ impl Page {
         let sidebar = Space::with_width(Length::FillPortion(4));
         let left_spacer = Space::with_width(Length::FillPortion(1));
         let top_spacer = Space::with_height(Length::FillPortion(1));
+        let bottom_spacer = Space::with_height(Length::FillPortion(1));
         let center_column = Column::new()
             .align_items(Align::Center)
             .width(Length::FillPortion(8))
@@ -83,7 +87,8 @@ impl Page {
             .push(title())
             .push(host_button(&mut self.host))
             .push(self.downloading.view())
-            .push(self.loading_server.view());
+            .push(self.loading_server.view())
+            .push(bottom_spacer);
 
         let ui = Row::new()
             .push(left_spacer)
