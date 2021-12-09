@@ -65,10 +65,10 @@ impl Page {
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::WantToHost => return self.request_to_host(rpc),
             Event::ObjToSync{left} => self.downloading.set_progress(left as f32),
-            Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32),
+            Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32, 0.0),
             Event::WorldUpdated => {
                 self.downloading.finished();
-                self.loading_server.start(100.0);
+                self.loading_server.start(100.0, 0.0);
             }
             Event::Loading(p) => self.loading_server.set_progress(p as f32),
         }

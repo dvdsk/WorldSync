@@ -24,7 +24,7 @@ pub enum Event {
 
 pub struct Page {
     pub host: protocol::Host,
-    loading: Option<Loading>,
+    loading: Loading,
     copy: button::State,
 }
 
@@ -32,7 +32,7 @@ impl Page {
     pub fn from(host: protocol::Host) -> Self {
         Self {
             host,
-            loading: None,
+            loading: Loading::default(),
             copy: button::State::default(),
         }
     }
@@ -42,10 +42,8 @@ impl Page {
         match event {
             HostLoading(p) => self
                 .loading
-                .as_mut()
-                .expect("host should have been marked as loading")
-                .set_progress(p as f32),
-            HostLoaded => self.loading = None,
+                .start(100.0, p as f32),
+            HostLoaded => self.loading.stop(),
         }
         Command::none()
     }
@@ -54,17 +52,15 @@ impl Page {
         let sidebar = Space::with_width(Length::FillPortion(4));
         let left_spacer = Space::with_width(Length::FillPortion(1));
         let top_spacer = Space::with_height(Length::FillPortion(1));
+        let bottom_spacer = Space::with_height(Length::FillPortion(1));
         let center_column = Column::new()
             .align_items(Align::Center)
             .width(Length::FillPortion(8))
             .push(top_spacer)
             .push(self.title())
-            .push(copy_button(&mut self.copy));
-
-        let center_column = match &self.loading {
-            Some(bar) => center_column.push(bar.view()),
-            None => center_column,
-        };
+            .push(copy_button(&mut self.copy))
+            .push(self.loading.view())
+            .push(bottom_spacer);
 
         let ui = Row::new()
             .push(left_spacer)
