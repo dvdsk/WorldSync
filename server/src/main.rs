@@ -1,12 +1,9 @@
-use std::sync::{Arc, RwLock};
-
 use server::Sessions;
 use server::{World, db::user::UserDb};
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use typed_sled::sled;
 use structopt::StructOpt;
 mod admin_ui;
-mod host;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -30,10 +27,11 @@ async fn main() {
     let sessions = Sessions::default();
     let user_db = UserDb::from(db.clone());
     let events = server::events_channel();
-    let world = World::from(db, events).await;
-    let host_state = Arc::new(RwLock::new(host::Host));
+    let host_state = server::host::Host::new();
+    let world = World::from(db, host_state.clone()).await;
 
-    host::monitor(host_state).await;
+    let (host_req, host_req_recv) = mpsc::channel(100);
+    server::host::monitor(host_state, events.clone(), host_req_recv).await;
 
-    server::host(sessions, user_db, world, opt.port, events).await;
+    server::host(sessions, user_db, world, opt.port, events, host_req).await;
 }

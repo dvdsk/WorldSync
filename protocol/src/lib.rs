@@ -50,9 +50,12 @@ pub enum Event {
     NewHost(HostDetails),
     HostLoading(u8),
     HostLoaded,
+    HostShuttingDown,
     HostShutdown,
+    HostDropped,
     HostUnreachable,
     HostRestored,
+    HostCanceld,
 }
 
 pub type UserId = u64;

@@ -1,14 +1,6 @@
-use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
-
-use protocol::SessionId;
+use protocol::HostState;
 use sync::{DirContent, DirUpdate, UpdateList};
-use tokio::net::{TcpStream, UnixStream};
-use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::task;
-use tokio::time::sleep;
 use tracing::{info, instrument};
 use typed_sled::sled;
 
@@ -16,26 +8,18 @@ use crate::db::world::WorldDb;
 
 #[derive(Clone, Debug)]
 pub struct World {
-    state: Arc<RwLock<State>>,
     db: WorldDb,
+    pub host: crate::host::Host,
 }
 
 impl World {
-    pub fn host(&self) -> Option<protocol::Host> {
-        let state = self.state.read().unwrap();
-        state.host()
-    }
-    pub fn set_host(&self, addr: SocketAddr, session_id: SessionId, name: String) -> bool {
-        let mut state = self.state.write().unwrap();
-        state.set_host(addr, session_id, name)
-    }
-
-    pub async fn from(db: sled::Db, sender: Arc<Sender<protocol::Event>>) -> Self {
+    pub async fn from(
+        db: sled::Db,
+        host: crate::host::Host,
+    ) -> Self {
         Self {
-            state: Arc::new(RwLock::new(State {
-                events: sender.subscribe(),
-            })),
             db: WorldDb::from(db).await,
+            host,
         }
     }
 
@@ -70,8 +54,9 @@ impl World {
     }
 
     pub async fn set_save(&self, source: PathBuf) -> Result<(), protocol::Error> {
-        if self.host().is_some() {
-            return Err(protocol::Error::SaveInUse);
+        match *self.host.state.read().await {
+            HostState::NoHost => (),
+            _ => return Err(protocol::Error::SaveInUse),
         }
 
         let content = DirContent::from_dir(source.clone()).await.unwrap();
@@ -85,46 +70,5 @@ impl World {
         info!("loaded and set save from: {:?}", source);
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Host {
-    name: String,
-    last_hb: Instant,
-    addr: SocketAddr,
-    session_id: SessionId,
-}
-
-#[derive(Debug)]
-pub struct State {
-    events: Receiver<protocol::Event>,
-}
-
-impl State {
-    pub fn host(&self) -> Option<protocol::Host> {
-        todo!();
-        // self.host.as_ref().map(|h| protocol::Host {
-        //     loading: true,
-        //     reachable: true,
-        //     name: h.name.clone(),
-        //     addr: h.addr,
-        //     id: h.session_id,
-        // })
-    }
-    pub fn set_host(&mut self, addr: SocketAddr, session_id: SessionId, name: String) -> bool {
-        todo!();
-        // if self.host.is_some() {
-        //     return false;
-        // }
-
-        // self.host = Some(Host {
-        //     name,
-        //     last_hb: Instant::now(),
-        //     session_id,
-        //     addr,
-        // });
-
-        // true
     }
 }

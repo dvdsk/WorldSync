@@ -1,6 +1,7 @@
 use futures::future;
 use futures::StreamExt;
 use protocol::Event;
+use tokio::sync::mpsc;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -19,6 +20,7 @@ use uuid::Uuid;
 pub mod admin_ui;
 pub mod db;
 mod world;
+pub mod host;
 use db::user::UserDb;
 pub use world::World;
 mod rpc;
@@ -81,6 +83,7 @@ pub async fn host(
     world: World,
     port: u16,
     events: Arc<broadcast::Sender<Event>>,
+    host_req: mpsc::Sender<host::HostEvent>,
 ) {
     let server_addr = (IpAddr::V4(Ipv4Addr::LOCALHOST), port);
 
@@ -107,6 +110,7 @@ pub async fn host(
                 sessions: sessions.clone(),
                 userdb: userdb.clone(),
                 world: world.clone(),
+                host_req: host_req.clone(),
             };
             channel.execute(server.serve())
         })
