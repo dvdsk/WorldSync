@@ -1,10 +1,14 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use protocol::SessionId;
 use sync::{DirContent, DirUpdate, UpdateList};
+use tokio::net::{TcpStream, UnixStream};
+use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::task;
+use tokio::time::sleep;
 use tracing::{info, instrument};
 use typed_sled::sled;
 
@@ -26,9 +30,11 @@ impl World {
         state.set_host(addr, session_id, name)
     }
 
-    pub async fn from(db: sled::Db) -> Self {
+    pub async fn from(db: sled::Db, sender: Arc<Sender<protocol::Event>>) -> Self {
         Self {
-            state: Arc::new(RwLock::new(State { host: None })),
+            state: Arc::new(RwLock::new(State {
+                events: sender.subscribe(),
+            })),
             db: WorldDb::from(db).await,
         }
     }
@@ -69,10 +75,7 @@ impl World {
         }
 
         let content = DirContent::from_dir(source.clone()).await.unwrap();
-        dbg!(&content);
         let (new_save, update_list) = UpdateList::for_new_save(&self.db, content);
-        dbg!(&update_list);
-        dbg!(&new_save);
         for (object_id, path) in update_list.0 {
             let full_path = source.join(path);
             let bytes = tokio::fs::read(full_path).await.unwrap();
@@ -95,31 +98,33 @@ pub struct Host {
 
 #[derive(Debug)]
 pub struct State {
-    host: Option<Host>,
+    events: Receiver<protocol::Event>,
 }
 
 impl State {
     pub fn host(&self) -> Option<protocol::Host> {
-        self.host.as_ref().map(|h| protocol::Host {
-            loading: true,
-            reachable: true,
-            name: h.name.clone(),
-            addr: h.addr,
-            id: h.session_id,
-        })
+        todo!();
+        // self.host.as_ref().map(|h| protocol::Host {
+        //     loading: true,
+        //     reachable: true,
+        //     name: h.name.clone(),
+        //     addr: h.addr,
+        //     id: h.session_id,
+        // })
     }
     pub fn set_host(&mut self, addr: SocketAddr, session_id: SessionId, name: String) -> bool {
-        if self.host.is_some() {
-            return false;
-        }
+        todo!();
+        // if self.host.is_some() {
+        //     return false;
+        // }
 
-        self.host = Some(Host {
-            name,
-            last_hb: Instant::now(),
-            session_id,
-            addr,
-        });
+        // self.host = Some(Host {
+        //     name,
+        //     last_hb: Instant::now(),
+        //     session_id,
+        //     addr,
+        // });
 
-        true
+        // true
     }
 }

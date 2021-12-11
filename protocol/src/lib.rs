@@ -45,11 +45,14 @@ pub enum Error {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
-    HostLoading(u8),
-    HostLoaded,
     #[cfg(not(feature = "deployed"))]
     TestHB(usize),
-    NewHost(Host),
+    NewHost(HostDetails),
+    HostLoading(u8),
+    HostLoaded,
+    HostShutdown,
+    HostUnreachable,
+    HostRestored,
 }
 
 pub type UserId = u64;
@@ -57,12 +60,19 @@ pub type HostId = Uuid;
 pub type SessionId = Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Host {
+pub struct HostDetails {
     pub name: String,
-    pub loading: bool,
-    pub reachable: bool,
     pub addr: SocketAddr,
     pub id: HostId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HostState {
+    NoHost,
+    Loading(HostDetails),
+    Up(HostDetails),
+    Unreachable(HostDetails),
+    ShuttingDown(HostDetails),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -110,7 +120,7 @@ pub trait Service {
     async fn update_password(id: SessionId, new: String) -> Result<(), Error>;
     async fn close_account(id: SessionId) -> Result<(), Error>;
     async fn await_event(id: SessionId) -> Result<Event, Error>;
-    async fn host(id: SessionId) -> Result<Option<Host>, Error>;
+    async fn host(id: SessionId) -> Result<HostState, Error>;
     async fn request_to_host(id: SessionId, host_id: HostId) -> Result<(), Error>;
     async fn dir_update(id: SessionId, dir: DirContent) -> Result<DirUpdate, Error>;
     async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
