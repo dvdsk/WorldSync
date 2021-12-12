@@ -33,7 +33,7 @@ pub enum Error {
 #[derivative(Debug)]
 pub struct Instance {
     #[derivative(Debug = "ignore")]
-    process: Child,
+    _process: Child,
     working_dir: PathBuf,
     stdout: Lines<BufReader<ChildStdout>>,
     stderr: Lines<BufReader<ChildStderr>>,
@@ -84,7 +84,7 @@ impl Instance {
         let stderr = BufReader::new(wait_for(&mut child.stderr).await).lines();
 
         let instance = Self {
-            process: child,
+            _process: child,
             working_dir,
             stdout,
             stderr,
