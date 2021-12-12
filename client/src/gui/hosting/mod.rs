@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
 pub use crate::Event as Msg;
+use crate::mc;
 use super::RpcConn;
 use super::parts::{ClearError, ErrorBar};
 
@@ -10,7 +11,7 @@ mod tasks;
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Error {
     #[error("Ran into problem running minecraft server: {0}")]
-    Mc(wrapper::Error),
+    Mc(#[from] wrapper::Error),
     #[error("No longer the host")]
     NotHost,
 }
@@ -25,7 +26,7 @@ impl From<protocol::Error> for Error {
 pub enum Event {
     ClearError(Error),
     Handle(Arc<wrapper::Handle>),
-    Mc(wrapper::parser::Line),
+    Mc(Result<wrapper::parser::Line,wrapper::Error>),
     Error(Error),
 }
 
@@ -49,13 +50,16 @@ impl Page {
 
     pub fn update(&mut self, event: Event, rpc: RpcConn) -> Command<Msg> {
         match event {
-            Event::Error(e) => self.errorbar.add(e),
+            Event::Error(e) => self.errorbar.add(dbg!(e)),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::Handle(h) => {
                 let h = Arc::try_unwrap(h).expect("could not get ownership over server handle");
                 self.server = Some(h);
             }
-            Event::Mc(line) => return Self::send_line(line, rpc),
+            Event::Mc(event) => match event {
+                Ok(line) => return mc::send_line(line, rpc),
+                Err(e) => self.errorbar.add(e.into()),
+            }
         }
         Command::none()
     }
@@ -73,7 +77,8 @@ impl Page {
             .push(center_column)
             .push(sidebar);
 
-        let errorbar = self.errorbar.view().map(move |e| Msg::HostingPage(e));
+        dbg!(&self.errorbar);
+        let errorbar = self.errorbar.view().map(Msg::HostingPage);
         Column::new()
             .width(Length::Fill)
             .push(errorbar)

@@ -52,7 +52,7 @@ impl State {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum Page {
     Login,
     Hosting,
@@ -107,8 +107,13 @@ impl Application for State {
             ClipHost => clipboard.write(self.can_join.as_ref().unwrap().host.addr.ip().to_string()),
             WorldUpdated => {
                 self.mc_server.start();
-                self.can_host
+                return self.can_host
                     .update(host::Event::WorldUpdated, self.unwrap_rpc());
+            }
+            Mc(event) => match self.page {
+                Page::Host => return self.can_host.update(host::Event::Mc(event), self.unwrap_rpc()),
+                Page::Hosting => return self.hosting.update(hosting::Event::Mc(event), self.unwrap_rpc()),
+                _ => panic!("should not recieve server events on other page"),
             }
             Server(event) => return self.handle_server_event(event),
             Error(e) => panic!("tmp error remove {:?}", e),

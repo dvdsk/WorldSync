@@ -8,11 +8,11 @@ use derivative::Derivative;
 use time::Time;
 
 
-#[derive(thiserror::Error, Derivative, Debug, Clone, PartialEq, Eq)]
-#[derivative(Hash)]
+#[derive(thiserror::Error, Derivative, Debug, Clone, Eq)]
+#[derivative(Hash, PartialEq)]
 pub enum Error {
     #[error("Could not parse minecraft server output, line: {line}, error: {error}")]
-    ParsingError{line: String, #[derivative(Hash="ignore")] error: ParseError<LineCol>},
+    ParsingError{line: String, #[derivative(PartialEq="ignore", Hash="ignore")] error: ParseError<LineCol>},
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]

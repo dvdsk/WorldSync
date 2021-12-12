@@ -1,3 +1,4 @@
+use core::fmt;
 use core::hash::Hash;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -13,15 +14,16 @@ pub trait ClearError: Clone {
     fn clear(e: Self::Error) -> Self;
 }
 
-pub struct ErrorBar<Err>(HashMap<Err, button::State>);
+#[derive(Debug)]
+pub struct ErrorBar<Err: fmt::Debug>(HashMap<Err, button::State>);
 
-impl<E> Default for ErrorBar<E> {
+impl<E: fmt::Debug> Default for ErrorBar<E> {
     fn default() -> Self {
         Self(HashMap::new())
     }
 }
 
-impl<'a, Err: Clone + Eq + Hash + Display> ErrorBar<Err> {
+impl<'a, Err: fmt::Debug + Clone + Eq + Hash + Display> ErrorBar<Err> {
     pub fn add(&mut self, err: Err) {
         self.0.insert(err, button::State::new());
     }

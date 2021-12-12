@@ -3,9 +3,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use futures::stream::{self, BoxStream};
+use iced::Command;
+use shared::tarpc::context::Context;
 use tracing::info;
 use wrapper::Instance;
 
+use crate::gui::RpcConn;
 use crate::world_dl::SERVER_PATH;
 use crate::Event;
 
@@ -70,14 +73,8 @@ async fn start(mut state: State) -> (Event, State) {
 }
 
 async fn forward_events(mut state: State) -> (Event, State) {
-    use crate::gui::hosting::Error as hError;
-    use crate::gui::hosting::Event as hEvent;
     let res = state.instance.as_mut().unwrap().next_event().await;
-    let event = match res {
-        Ok(event) => hEvent::Mc(event),
-        Err(err) => hEvent::Error(hError::Mc(err)),
-    };
-    (Event::HostingPage(event), state)
+    (Event::Mc(res), state)
 }
 
 async fn state_machine(state: State) -> Option<(Event, State)> {
@@ -86,4 +83,24 @@ async fn state_machine(state: State) -> Option<(Event, State)> {
         Phase::Running => Some(forward_events(state).await),
         Phase::Error => None,
     }
+}
+
+async fn send(line: wrapper::parser::Line, rpc: RpcConn) -> crate::Event {
+    use crate::gui::hosting::Event as hEvent;
+    use crate::gui::hosting::Error as hError;
+    let res = rpc
+        .client
+        .pub_mc_line(Context::current(), rpc.session, line)
+        .await
+        .expect("rpc failure");
+    match res {
+        Ok(_) => Event::Empty,
+        Err(protocol::Error::NotHost) => Event::HostingPage(hEvent::Error(hError::NotHost)),
+        e_ => panic!("unexpected error: {:?}", e_),
+    }
+}
+
+pub fn send_line(line: wrapper::parser::Line, rpc: RpcConn) -> Command<Event> {
+    let send = send(line, rpc);
+    Command::perform(send, |msg| msg)
 }

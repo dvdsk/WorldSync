@@ -39,7 +39,7 @@ pub struct Instance {
     stderr: Lines<BufReader<ChildStderr>>,
 }
 
-const GC_ARGS: &[&'static str] = &[
+const GC_ARGS: &[&str] = &[
     "-Dsun.rmi.dgc.server.gcInterval=2147483646", // do not garbace collect every min
     "-XX:+UnlockExperimentalVMOptions",           // unknown but recommanded
     "-XX:G1NewSizePercent=20",                    // G1GC keep 20% of heap for new objects
@@ -103,7 +103,7 @@ impl Instance {
                         Ok(Some(line)) => match parser::parse(line) {
                             Ok(line) => return Ok(line),
                             Err(e) => {debug!("{:?}", e); continue}
-                }
+                        }
                         Ok(None) => continue,
                     }
                 }
@@ -153,7 +153,7 @@ async fn handle_stderr(line: String, instance: &mut Instance) -> Error {
 
 pub struct Handle(ChildStdin);
 
-pub fn outdated_java_error(lines: &String) -> Error {
+pub fn outdated_java_error(lines: &str) -> Error {
     let start = lines.find("class file version ").unwrap();
     let stop = start + lines[start..].find(')').unwrap();
     let required = lines[start..stop].to_owned();

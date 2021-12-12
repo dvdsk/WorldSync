@@ -59,9 +59,8 @@ impl State {
             },
             HostDropped | HostCanceld | HostShutdown => self.page = Page::Host,
             TestHB(n) => info!("recieved hb {}", n),
-            _e => match self.can_join.as_mut() {
-                Some(p) => p.host_state = _e.into(),
-                None => (),
+            _e => if let Some(p) = self.can_join.as_mut() {
+                p.host_state = _e.into()
             },
         }
         Command::none()

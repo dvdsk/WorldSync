@@ -47,7 +47,7 @@ pub enum Error {
     #[error("Lost connection to meta conn")]
     NoMetaConn,
     #[error("Could not access local file system, is folder read only or hard drive full?")]
-    FsError,
+    Fs,
     #[error("{0}")]
     Protocol(#[from] protocol::Error),
 }
@@ -60,13 +60,13 @@ impl From<RpcError> for Error {
 
 impl From<sync::Error> for Error {
     fn from(_: sync::Error) -> Self {
-        Error::FsError
+        Error::Fs
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(_: std::io::Error) -> Self {
-        Error::FsError
+        Error::Fs
     }
 }
 

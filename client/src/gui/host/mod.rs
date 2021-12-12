@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use crate::gui::parts::ClearError;
 pub use crate::Event as Msg;
-use crate::world_dl;
+use crate::{world_dl, mc};
 use protocol::HostId;
 use iced::{Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text, button};
 
@@ -17,7 +17,7 @@ pub enum Error {
     NoMetaConn,
     #[error("Error downloading world: {0}")]
     Sync(#[from] world_dl::Error),
-    #[error("Could not start minecraft server")]
+    #[error("Could not start minecraft server: {0}")]
     ServerStart(#[from] wrapper::Error),
 }
 
@@ -36,6 +36,7 @@ pub enum Event {
     DlStarting{num_obj: usize},
     Loading(u8),
     WorldUpdated,
+    Mc(Result<wrapper::parser::Line,wrapper::Error>),
 }
 
 impl ClearError for Event {
@@ -71,6 +72,10 @@ impl Page {
                 self.loading_server.start(100.0, 0.0);
             }
             Event::Loading(p) => self.loading_server.set_progress(p as f32),
+            Event::Mc(event) => match event {
+                Ok(line) => return mc::send_line(line, rpc),
+                Err(e) => self.errorbar.add(e.into()),
+            }
         }
         Command::none()
     }
@@ -95,7 +100,7 @@ impl Page {
             .push(center_column)
             .push(sidebar);
 
-        let errorbar = self.errorbar.view().map(move |e| Msg::HostPage(e));
+        let errorbar = self.errorbar.view().map(Msg::HostPage);
         Column::new()
             .width(Length::Fill)
             .push(errorbar)

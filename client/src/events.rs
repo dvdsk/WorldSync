@@ -1,9 +1,9 @@
-use crate::gui::{RpcConn, host, hosting, login};
+use crate::gui::{host, hosting, login, RpcConn};
 use crate::Error;
 use futures::stream::{self, BoxStream};
+use protocol::HostState;
 use shared::tarpc::client::RpcError;
 use shared::tarpc::context::Context;
-use protocol::HostState;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, SystemTime};
@@ -16,6 +16,7 @@ pub enum Event {
     LoginPage(login::Event),
     HostingPage(hosting::Event),
     Server(protocol::Event),
+    Mc(Result<wrapper::parser::Line, wrapper::Error>),
     Error(Error),
     ClipHost,
     Empty,
@@ -68,7 +69,7 @@ where
 async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
     let mut context = Context::current();
     loop {
-        context.deadline = SystemTime::now() + Duration::from_secs(60*5);
+        context.deadline = SystemTime::now() + Duration::from_secs(60 * 5);
         let res = conn.client.await_event(context, conn.session).await;
 
         match res {
@@ -84,9 +85,6 @@ async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
 async fn await_event(conn: &mut RpcConn) -> Event {
     match get_events(conn).await {
         Err(err) => Event::Error(err),
-        Ok(ev) => {
-            let event = Event::from(ev);
-            event
-        }
+        Ok(ev) => Event::from(ev),
     }
 }

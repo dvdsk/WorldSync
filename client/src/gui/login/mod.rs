@@ -149,7 +149,7 @@ impl Page {
     }
 
     pub fn view(&mut self) -> Element<Msg> {
-        let inputs = self.inputs.view().map(move |e| Msg::LoginPage(e));
+        let inputs = self.inputs.view().map(Msg::LoginPage);
         let title = Text::new("WorldSync")
             .width(Length::FillPortion(1))
             .horizontal_alignment(HorizontalAlignment::Center);
@@ -170,7 +170,7 @@ impl Page {
             .push(Space::with_width(Length::FillPortion(3)))
             .push(column)
             .push(Space::with_width(Length::FillPortion(3)));
-        let errorbar = self.errorbar.view().map(move |e| Msg::LoginPage(e));
+        let errorbar = self.errorbar.view().map(Msg::LoginPage);
         Column::new()
             .width(Length::Fill)
             .push(errorbar)
