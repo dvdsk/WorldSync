@@ -28,7 +28,7 @@ impl Page {
         })
     }
 
-    pub fn is_us(&self, host: &protocol::Host) -> bool {
+    pub fn is_us(&self, host: &protocol::HostDetails) -> bool {
         self.host_id == Some(host.id)
     }
 }

@@ -3,14 +3,14 @@ use crate::Error;
 use futures::stream::{self, BoxStream};
 use shared::tarpc::client::RpcError;
 use shared::tarpc::context::Context;
-use protocol::Host;
+use protocol::HostState;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    LoggedIn(RpcConn, Option<Host>),
+    LoggedIn(RpcConn, HostState),
     WorldUpdated,
     HostPage(host::Event),
     LoginPage(login::Event),

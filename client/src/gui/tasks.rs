@@ -1,3 +1,8 @@
+use iced::Command;
+use tracing::info;
+
+use crate::Event;
+
 use super::{RpcConn, State};
 
 #[derive(Default, Clone)]
@@ -28,5 +33,37 @@ impl SubStatus {
 impl State {
     pub fn unwrap_rpc(&self) -> RpcConn {
         self.rpc.as_ref().unwrap().clone()
+    }
+
+    pub fn handle_server_event(&mut self, event: protocol::Event) -> Command<Event> {
+        use super::{host, join, Page};
+        use protocol::Event::*;
+
+        match event {
+            HostLoading(p) if self.page == Page::Host => {
+                return self
+                    .can_host
+                    .update(host::Event::Loading(p), self.unwrap_rpc())
+            }
+            HostLoaded if self.page == Page::Host => self.page = Page::Hosting,
+            NewHost(host) => match self.can_host.is_us(&host) {
+                true => {
+                    info!("attempting to host");
+                    self.downloading_world.start();
+                }
+                false => {
+                    info!("got new host: {:?}", host);
+                    self.can_join = Some(join::Page::from(host, join::HostState::Loading(0)));
+                    self.page = Page::Join;
+                }
+            },
+            HostDropped | HostCanceld | HostShutdown => self.page = Page::Host,
+            TestHB(n) => info!("recieved hb {}", n),
+            _e => match self.can_join.as_mut() {
+                Some(p) => p.host_state = _e.into(),
+                None => (),
+            },
+        }
+        Command::none()
     }
 }

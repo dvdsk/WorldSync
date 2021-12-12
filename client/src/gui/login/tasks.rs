@@ -1,6 +1,6 @@
 use crate::gui::{RpcConn, style};
+use protocol::HostState;
 pub use protocol::ServiceClient;
-use protocol::Host;
 use shared::tarpc;
 pub use tarpc::context;
 use tracing::instrument;
@@ -21,7 +21,7 @@ pub async fn login(
     port: u16,
     username: String,
     password: String,
-) -> Result<(RpcConn, Option<Host>), Error> {
+) -> Result<(RpcConn, HostState), Error> {
     let client = protocol::connect(&domain, port)
         .await
         .map_err(|_| Error::NoMetaConn)?;

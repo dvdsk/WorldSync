@@ -1,7 +1,8 @@
 pub use crate::Event as Msg;
 use iced::{
-    button, Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text,
+    button, Align, Button, Column, Element, HorizontalAlignment, Length, Row, Space, Text,
 };
+use protocol::HostDetails;
 
 use super::parts::Loading;
 
@@ -18,34 +19,57 @@ impl From<protocol::Error> for Error {
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    HostLoading(u8),
-    HostLoaded,
+}
+
+#[derive(Debug, Clone)]
+pub enum HostState {
+    Loading(u8),
+    Running,
+    ShuttingDown,
+    Unreachable,
+}
+
+impl From<protocol::HostState> for HostState {
+    fn from(state: protocol::HostState) -> Self {
+        use protocol::HostState::*;
+        match state {
+            NoHost => panic!("need not"),
+            Loading(_) => Self::Loading(0),
+            Up(_) => Self::Running,
+            Unreachable(_) => Self::Unreachable,
+            ShuttingDown(_) => Self::ShuttingDown,
+        }
+    }
+}
+
+impl From<protocol::Event> for HostState {
+    fn from(e: protocol::Event) -> Self {
+        use protocol::Event::*;
+        match e {
+            HostLoading(progress) => Self::Loading(progress),
+            HostLoaded => Self::Running,
+            HostShuttingDown => Self::ShuttingDown,
+            HostUnreachable => Self::Unreachable,
+            _e => panic!("event should not be handled here: {:?}", _e),
+        }
+    }
 }
 
 pub struct Page {
-    pub host: protocol::Host,
+    pub host: HostDetails,
+    pub host_state: HostState,
     loading: Loading,
     copy: button::State,
 }
 
 impl Page {
-    pub fn from(host: protocol::Host) -> Self {
+    pub fn from(host: HostDetails, host_state: HostState) -> Self {
         Self {
             host,
+            host_state,
             loading: Loading::default(),
             copy: button::State::default(),
         }
-    }
-
-    pub fn update(&mut self, event: Event) -> Command<Msg> {
-        use Event::*;
-        match event {
-            HostLoading(p) => self
-                .loading
-                .start(100.0, p as f32),
-            HostLoaded => self.loading.stop(),
-        }
-        Command::none()
     }
 
     pub fn view(&mut self) -> Element<Msg> {
@@ -73,10 +97,14 @@ impl Page {
 
 impl Page {
     fn title(&self) -> Text {
-        let label = match self.host.loading {
-            true => format!("{} is hosting", self.host.name),
-            false => format!("{} started hosting", self.host.name),
+        use HostState::*;
+        let label = match self.host_state {
+            Loading(_) => format!("{} started hosting", self.host.name),
+            Running => format!("{} is hosting", self.host.name),
+            ShuttingDown => format!("{} was hosting (shutting down)", self.host.name),
+            Unreachable => format!("{} is hosting and having issues", self.host.name),
         };
+
         Text::new(label)
             .width(Length::FillPortion(1))
             .horizontal_alignment(HorizontalAlignment::Center)
