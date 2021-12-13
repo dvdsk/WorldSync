@@ -11,7 +11,7 @@ use protocol::{HostDetails, HostId, HostState, Service, SessionId, User, UserId}
 use shared::tarpc;
 use tarpc::context;
 use tokio::sync::broadcast::error::RecvError;
-use tracing::{info, warn};
+use tracing::{info, instrument, warn};
 
 #[tarpc::server]
 impl Service for ConnState {
@@ -102,9 +102,11 @@ impl Service for ConnState {
     ) -> Result<(), Error> {
         let user_id = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let name = self.userdb.get_name(user_id)?.unwrap();
+        let mut addr = self.peer_addr;
+        addr.set_port(25565);
         let details = HostDetails {
             name,
-            addr: self.peer_addr,
+            addr,
             id: host_id,
         };
         self.host_req
@@ -147,6 +149,7 @@ impl Service for ConnState {
         Ok(WorldDb::get_object(object).await?)
     }
 
+    #[instrument(err, skip(self))]
     async fn pub_mc_line(self, _: context::Context, id: HostId, line: Line) -> Result<(), Error> {
         match &*self.world.host.state.read().await {
             HostState::Up(host) | HostState::Loading(host) => {
@@ -157,7 +160,10 @@ impl Service for ConnState {
             _ => return Err(Error::NotHost),
         }
 
-        crate::handle_line(line, self.events.clone());
+        match HostEvent::try_from(line) {
+            Ok(event) => self.host_req.send(event).await.unwrap(),
+            Err(_) => (), // unprocessed line
+        }
         Ok(())
     }
 

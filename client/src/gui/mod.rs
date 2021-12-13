@@ -24,7 +24,7 @@ pub struct RpcConn {
 
 pub struct State {
     login: login::Page,
-    hosting: hosting::Page,
+    hosting: Option<hosting::Page>,
     can_host: host::Page,
     can_join: Option<join::Page>,
     page: Page,
@@ -39,7 +39,7 @@ impl State {
     fn new() -> Self {
         Self {
             login: login::Page::new(),
-            hosting: hosting::Page::new(),
+            hosting: None,
             can_host: host::Page::new(),
             can_join: None,
             page: Page::Login,
@@ -83,7 +83,14 @@ impl Application for State {
         match message {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
-            HostingPage(event) => return self.hosting.update(event, self.unwrap_rpc()),
+            HostingPage(event) => {
+                let rpc = self.unwrap_rpc();
+                return self
+                    .hosting
+                    .as_mut()
+                    .unwrap()
+                    .update(event, rpc)
+            }
             LoggedIn(rpc, host_state) => {
                 use HostState::*;
                 self.server_events = true;
@@ -107,14 +114,29 @@ impl Application for State {
             ClipHost => clipboard.write(self.can_join.as_ref().unwrap().host.addr.ip().to_string()),
             WorldUpdated => {
                 self.mc_server.start();
-                return self.can_host
+                return self
+                    .can_host
                     .update(host::Event::WorldUpdated, self.unwrap_rpc());
             }
-            Mc(event) => match self.page {
-                Page::Host => return self.can_host.update(host::Event::Mc(event), self.unwrap_rpc()),
-                Page::Hosting => return self.hosting.update(hosting::Event::Mc(event), self.unwrap_rpc()),
-                _ => panic!("should not recieve server events on other page"),
+            McHandle(handle) => {
+                self.hosting = Some(hosting::Page::from(handle, self.can_host.host_id.unwrap()))
             }
+            Mc(event) => match self.page {
+                Page::Host => {
+                    return self
+                        .can_host
+                        .update(host::Event::Mc(event), self.unwrap_rpc())
+                }
+                Page::Hosting => {
+                let rpc = self.unwrap_rpc();
+                    return self
+                        .hosting
+                        .as_mut()
+                        .unwrap()
+                        .update(hosting::Event::Mc(event), rpc)
+                }
+                _ => panic!("should not recieve server events on other page"),
+            },
             Server(event) => return self.handle_server_event(event),
             Error(e) => panic!("tmp error remove {:?}", e),
             Empty => (),
@@ -144,7 +166,7 @@ impl Application for State {
             Page::Login => self.login.view(),
             Page::Join => self.can_join.as_mut().unwrap().view(),
             Page::Host => self.can_host.view(),
-            Page::Hosting => self.hosting.view(),
+            Page::Hosting => self.hosting.as_mut().unwrap().view(),
         }
     }
 }

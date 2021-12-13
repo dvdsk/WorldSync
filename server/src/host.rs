@@ -15,7 +15,7 @@ async fn unreachable(addr: SocketAddr) {
             .await
             .map_err(|_| ())?;
         loop {
-            sleep(Duration::from_secs(5 * 60)).await;
+            sleep(Duration::from_secs( 20)).await;
             conn.status().await.map_err(|_| ())?;
         }
     }
@@ -38,11 +38,25 @@ async fn reachable(addr: SocketAddr) {
 /// host. This must be checked on the sender side!
 #[derive(Debug)]
 pub enum HostEvent {
-    Loading,
+    Loading(u8),
     Loaded,
     RequestToHost(HostDetails),
     ShuttingDown,
     ShutDown,
+}
+
+use wrapper::parser::Line;
+impl TryFrom<Line> for HostEvent {
+    type Error = Line;
+    fn try_from(line: Line) -> Result<Self, Self::Error> {
+        use wrapper::parser::Message::*;
+        match line.msg {
+            Loading(p) => Ok(HostEvent::Loading(p)),
+            DoneLoading(_) => Ok(HostEvent::Loaded),
+            Stopping => Ok(HostEvent::ShuttingDown),
+            _ => Err(line),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -88,7 +102,10 @@ async fn loaded_or_timeout(
     let mut deadline = Instant::now() + Duration::from_secs(5 * 60);
     while let Ok(event) = time::timeout_at(deadline, events.recv()).await {
         match event.unwrap() {
-            HostEvent::Loading => deadline = Instant::now() + Duration::from_secs(5 * 60),
+            HostEvent::Loading(p) => {
+                let _irrelevant = broadcast.send(Event::HostLoading(p));
+                deadline = Instant::now() + Duration::from_secs(5 * 60);
+            }
             HostEvent::Loaded => {
                 let _irrelevant = broadcast.send(Event::HostLoaded);
                 info!("host done loading: {:?}", host);

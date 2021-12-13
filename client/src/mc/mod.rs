@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use futures::stream::{self, BoxStream};
 use iced::Command;
+use protocol::HostId;
 use shared::tarpc::context::Context;
 use tracing::info;
 use wrapper::Instance;
@@ -65,8 +66,7 @@ async fn start(mut state: State) -> (Event, State) {
             state.instance = Some(instance);
             state.phase = Phase::Running;
             let handle = Arc::new(handle);
-            use crate::gui::hosting::Event as hEvent;
-            let event = Event::HostingPage(hEvent::Handle(handle));
+            let event = Event::McHandle(handle);
             (event, state)
         }
     }
@@ -85,12 +85,12 @@ async fn state_machine(state: State) -> Option<(Event, State)> {
     }
 }
 
-async fn send(line: wrapper::parser::Line, rpc: RpcConn) -> crate::Event {
+async fn send(line: wrapper::parser::Line, rpc: RpcConn, host_id: HostId) -> crate::Event {
     use crate::gui::hosting::Event as hEvent;
     use crate::gui::hosting::Error as hError;
     let res = rpc
         .client
-        .pub_mc_line(Context::current(), rpc.session, line)
+        .pub_mc_line(Context::current(), host_id, line)
         .await
         .expect("rpc failure");
     match res {
@@ -100,7 +100,7 @@ async fn send(line: wrapper::parser::Line, rpc: RpcConn) -> crate::Event {
     }
 }
 
-pub fn send_line(line: wrapper::parser::Line, rpc: RpcConn) -> Command<Event> {
-    let send = send(line, rpc);
+pub fn send_line(line: wrapper::parser::Line, rpc: RpcConn, host_id: HostId) -> Command<Event> {
+    let send = send(line, rpc, host_id);
     Command::perform(send, |msg| msg)
 }

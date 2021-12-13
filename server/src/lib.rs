@@ -8,7 +8,6 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use tokio::sync::broadcast;
 use tokio::sync::Mutex;
-use tracing::debug;
 use tracing::info;
 
 use protocol::{Service, UserId};
@@ -118,18 +117,4 @@ pub async fn host(
         .buffer_unordered(10)
         .for_each(|_| async {})
         .await;
-}
-
-use wrapper::parser::Line;
-pub fn handle_line(line: Line, events: Arc<broadcast::Sender<Event>>) {
-    use wrapper::parser::Message;
-    match line.msg {
-        Message::Loading(p) => {
-            let _ignore_err = events.send(protocol::Event::HostLoading(p));
-        }
-        Message::DoneLoading(_) => {
-            let _ignore_err = events.send(protocol::Event::HostLoaded);
-        }
-        m => debug!("unhandled mc msg: {:?}", m),
-    }
 }

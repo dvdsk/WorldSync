@@ -6,6 +6,7 @@ use shared::tarpc::client::RpcError;
 use shared::tarpc::context::Context;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone)]
@@ -17,6 +18,7 @@ pub enum Event {
     HostingPage(hosting::Event),
     Server(protocol::Event),
     Mc(Result<wrapper::parser::Line, wrapper::Error>),
+    McHandle(Arc<wrapper::Handle>),
     Error(Error),
     ClipHost,
     Empty,

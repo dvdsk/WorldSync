@@ -52,7 +52,7 @@ pub struct Page {
     host: button::State,
     downloading: Loading,
     loading_server: Loading,
-    host_id: Option<HostId>,
+    pub host_id: Option<HostId>,
 }
 
 impl Page {
@@ -73,7 +73,7 @@ impl Page {
             }
             Event::Loading(p) => self.loading_server.set_progress(p as f32),
             Event::Mc(event) => match event {
-                Ok(line) => return mc::send_line(line, rpc),
+                Ok(line) => return mc::send_line(line, rpc, self.host_id.unwrap()),
                 Err(e) => self.errorbar.add(e.into()),
             }
         }

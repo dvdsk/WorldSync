@@ -31,7 +31,10 @@ async fn main() {
     let world = World::from(db, host_state.clone()).await;
 
     let (host_req, host_req_recv) = mpsc::channel(100);
-    server::host::monitor(host_state, events.clone(), host_req_recv).await;
+    let events_clone = events.clone();
+    tokio::spawn(async move {
+        server::host::monitor(host_state, events_clone, host_req_recv).await;
+    });
 
     server::host(sessions, user_db, world, opt.port, events, host_req).await;
 }
