@@ -17,3 +17,4 @@ thiserror = "1.0"
 bincode = "1.0"
 shared = { path = "../shared" }
 sync = { path = "../sync" }
+wrapper = { path = "../wrapper" }

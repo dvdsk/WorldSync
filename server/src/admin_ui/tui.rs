@@ -218,6 +218,7 @@ impl Tui {
 
         if is_empty {
             println!("can not load empty save");
+            return;
         }
 
         let mut context = Context::current();

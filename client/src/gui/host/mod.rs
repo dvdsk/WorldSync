@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use crate::gui::parts::ClearError;
 pub use crate::Event as Msg;
-use crate::world_dl;
+use crate::{world_dl, mc};
 use protocol::HostId;
 use iced::{Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text, button};
 
@@ -17,7 +17,7 @@ pub enum Error {
     NoMetaConn,
     #[error("Error downloading world: {0}")]
     Sync(#[from] world_dl::Error),
-    #[error("Could not start minecraft server")]
+    #[error("Could not start minecraft server: {0}")]
     ServerStart(#[from] wrapper::Error),
 }
 
@@ -34,7 +34,9 @@ pub enum Event {
     WantToHost,
     ObjToSync{left: usize},
     DlStarting{num_obj: usize},
+    Loading(u8),
     WorldUpdated,
+    Mc(Result<wrapper::parser::Line,wrapper::Error>),
 }
 
 impl ClearError for Event {
@@ -50,7 +52,7 @@ pub struct Page {
     host: button::State,
     downloading: Loading,
     loading_server: Loading,
-    host_id: Option<HostId>,
+    pub host_id: Option<HostId>,
 }
 
 impl Page {
@@ -58,14 +60,22 @@ impl Page {
         Self::default()
     }
 
-    pub fn update(&mut self, event: Event, rpc: &mut Option<RpcConn>) -> Command<Msg> {
-        match dbg!(event) {
+    pub fn update(&mut self, event: Event, rpc: RpcConn) -> Command<Msg> {
+        match event {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::WantToHost => return self.request_to_host(rpc),
             Event::ObjToSync{left} => self.downloading.set_progress(left as f32),
-            Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32),
-            Event::WorldUpdated => self.downloading.finished(),
+            Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32, 0.0),
+            Event::WorldUpdated => {
+                self.downloading.finished();
+                self.loading_server.start(100.0, 0.0);
+            }
+            Event::Loading(p) => self.loading_server.set_progress(p as f32),
+            Event::Mc(event) => match event {
+                Ok(line) => return mc::send_line(line, rpc, self.host_id.unwrap()),
+                Err(e) => self.errorbar.add(e.into()),
+            }
         }
         Command::none()
     }
@@ -74,6 +84,7 @@ impl Page {
         let sidebar = Space::with_width(Length::FillPortion(4));
         let left_spacer = Space::with_width(Length::FillPortion(1));
         let top_spacer = Space::with_height(Length::FillPortion(1));
+        let bottom_spacer = Space::with_height(Length::FillPortion(1));
         let center_column = Column::new()
             .align_items(Align::Center)
             .width(Length::FillPortion(8))
@@ -81,14 +92,15 @@ impl Page {
             .push(title())
             .push(host_button(&mut self.host))
             .push(self.downloading.view())
-            .push(self.loading_server.view());
+            .push(self.loading_server.view())
+            .push(bottom_spacer);
 
         let ui = Row::new()
             .push(left_spacer)
             .push(center_column)
             .push(sidebar);
 
-        let errorbar = self.errorbar.view().map(move |e| Msg::HostPage(e));
+        let errorbar = self.errorbar.view().map(Msg::HostPage);
         Column::new()
             .width(Length::Fill)
             .push(errorbar)

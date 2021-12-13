@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use sync::{DirContent, DirUpdate, ObjectId};
+use wrapper::parser::Line;
 
 use serde::{Deserialize, Serialize};
 use shared::tarpc;
@@ -36,14 +37,25 @@ pub enum Error {
     DirDoesNotExist,
     #[error("could not load save, someone is currently hosting")]
     SaveInUse,
+    #[error("could not dump save, folder is not empty")]
+    NotEmpty,
+    #[error("session is not currently hosting")]
+    NotHost,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
-    HostLoading(u8),
     #[cfg(not(feature = "deployed"))]
     TestHB(usize),
-    NewHost(Host),
+    NewHost(HostDetails),
+    HostLoading(u8),
+    HostLoaded,
+    HostShuttingDown,
+    HostShutdown,
+    HostDropped,
+    HostUnreachable,
+    HostRestored,
+    HostCanceld,
 }
 
 pub type UserId = u64;
@@ -51,9 +63,19 @@ pub type HostId = Uuid;
 pub type SessionId = Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Host {
+pub struct HostDetails {
+    pub name: String,
     pub addr: SocketAddr,
     pub id: HostId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HostState {
+    NoHost,
+    Loading(HostDetails),
+    Up(HostDetails),
+    Unreachable(HostDetails),
+    ShuttingDown(HostDetails),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -101,10 +123,11 @@ pub trait Service {
     async fn update_password(id: SessionId, new: String) -> Result<(), Error>;
     async fn close_account(id: SessionId) -> Result<(), Error>;
     async fn await_event(id: SessionId) -> Result<Event, Error>;
-    async fn host(id: SessionId) -> Result<Option<Host>, Error>;
+    async fn host(id: SessionId) -> Result<HostState, Error>;
     async fn request_to_host(id: SessionId, host_id: HostId) -> Result<(), Error>;
     async fn dir_update(id: SessionId, dir: DirContent) -> Result<DirUpdate, Error>;
     async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
+    async fn pub_mc_line(id: HostId, line: Line) -> Result<(), Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
     async fn list_users() -> Result<Vec<(UserId, User)>, Error>;

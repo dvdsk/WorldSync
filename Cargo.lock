@@ -83,6 +83,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-minecraft-ping"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7e9b24c3f280807ab70f026e99b052dbd7093af675e6999167a2b85009bebea"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2368,6 +2382,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "uuid",
+ "wrapper",
 ]
 
 [[package]]
@@ -2773,6 +2788,7 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "async-minecraft-ping",
  "bincode",
  "dialoguer",
  "futures",
@@ -2789,6 +2805,7 @@ dependencies = [
  "tracing-subscriber 0.3.3",
  "typed-sled",
  "uuid",
+ "wrapper",
 ]
 
 [[package]]
@@ -3923,8 +3940,11 @@ dependencies = [
 name = "wrapper"
 version = "0.1.0"
 dependencies = [
+ "derivative",
  "peg",
  "reqwest",
+ "serde",
+ "shared",
  "thiserror",
  "time",
  "tokio",

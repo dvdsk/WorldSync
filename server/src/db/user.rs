@@ -112,6 +112,10 @@ impl UserDb {
         self.get_entry(user_id).map(|o| o.map(|e| e.user))
     }
 
+    pub fn get_name(&self, user_id: UserId) -> DbResult<Option<String>> {
+        self.get_user(user_id).map(|o| o.map(|u| u.username))
+    }
+
     pub fn get_user_id(&self, username: &str) -> Option<UserId> {
         self.index.get(username)
     }

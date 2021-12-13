@@ -9,8 +9,11 @@ edition = "2021"
 tokio = {version = "1", features = ["process", "io-util", "macros", "rt-multi-thread", "fs", "time"]}
 tracing = "0.1"
 thiserror = "1"
+derivative = "2"
 peg = "0.7"
-time = "0.3"
+time = { version = "0.3", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 reqwest = "0.11"
+shared = { path = "../shared" }

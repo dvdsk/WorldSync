@@ -1,7 +1,7 @@
-use crate::{events, world_dl, mc, Event};
+use crate::{events, mc, world_dl, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
-use protocol::{ServiceClient, Uuid};
+use protocol::{HostState, ServiceClient, Uuid};
 use tracing::info;
 
 pub mod host;
@@ -24,9 +24,9 @@ pub struct RpcConn {
 
 pub struct State {
     login: login::Page,
-    hosting: hosting::Page,
+    hosting: Option<hosting::Page>,
     can_host: host::Page,
-    can_join: join::Page,
+    can_join: Option<join::Page>,
     page: Page,
 
     rpc: Option<RpcConn>,
@@ -39,9 +39,9 @@ impl State {
     fn new() -> Self {
         Self {
             login: login::Page::new(),
-            hosting: hosting::Page::new(),
+            hosting: None,
             can_host: host::Page::new(),
-            can_join: join::Page::new(),
+            can_join: None,
             page: Page::Login,
 
             rpc: None,
@@ -52,6 +52,7 @@ impl State {
     }
 }
 
+#[derive(Debug, PartialEq)]
 enum Page {
     Login,
     Hosting,
@@ -75,50 +76,70 @@ impl Application for State {
     fn update(
         &mut self,
         message: Self::Message,
-        _clipboard: &mut Clipboard,
+        clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
-        use protocol::Event::*;
         use Event::*;
 
-        match dbg!(message) {
+        match message {
             LoginPage(event) => return self.login.update(event),
-            HostPage(event) => return self.can_host.update(event, &mut self.rpc),
-            HostingPage(event) => return self.hosting.update(event),
-            LoggedIn(rpc, host) => {
+            HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
+            HostingPage(event) => {
+                let rpc = self.unwrap_rpc();
+                return self
+                    .hosting
+                    .as_mut()
+                    .unwrap()
+                    .update(event, rpc)
+            }
+            LoggedIn(rpc, host_state) => {
+                use HostState::*;
                 self.server_events = true;
-                match host {
-                    Some(host) => {
-                        info!("logged in, can join {:?}", host);
-                        self.rpc = Some(rpc);
-                        self.page = Page::Join;
-                    }
-                    None => {
+                match host_state.clone() {
+                    NoHost => {
                         info!("logged in, no one is hosting");
                         self.rpc = Some(rpc);
                         self.page = Page::Host;
                     }
+                    Loading(details)
+                    | Up(details)
+                    | Unreachable(details)
+                    | ShuttingDown(details) => {
+                        info!("logged in, can join {:?}", host_state);
+                        self.rpc = Some(rpc);
+                        self.can_join = Some(join::Page::from(details, host_state.into()));
+                        self.page = Page::Join;
+                    }
                 }
             }
+            ClipHost => clipboard.write(self.can_join.as_ref().unwrap().host.addr.ip().to_string()),
             WorldUpdated => {
                 self.mc_server.start();
-                self.can_host.update(host::Event::WorldUpdated, &mut self.rpc);
+                return self
+                    .can_host
+                    .update(host::Event::WorldUpdated, self.unwrap_rpc());
             }
-            ServerStarted => {
-                self.page = Page::Hosting;
+            McHandle(handle) => {
+                self.hosting = Some(hosting::Page::from(handle, self.can_host.host_id.unwrap()))
             }
-            Server(NewHost(host)) if self.can_host.is_us(&host) => {
-                info!("attempting to host");
-                self.downloading_world.start();
-            }
-            Server(NewHost(host)) => {
-                info!("got new host: {:?}", host);
-                self.can_join.host = Some(host);
-                self.page = Page::Join;
-            }
-            Server(TestHB(n)) => info!("recieved hb {}", n),
+            Mc(event) => match self.page {
+                Page::Host => {
+                    return self
+                        .can_host
+                        .update(host::Event::Mc(event), self.unwrap_rpc())
+                }
+                Page::Hosting => {
+                let rpc = self.unwrap_rpc();
+                    return self
+                        .hosting
+                        .as_mut()
+                        .unwrap()
+                        .update(hosting::Event::Mc(event), rpc)
+                }
+                _ => panic!("should not recieve server events on other page"),
+            },
+            Server(event) => return self.handle_server_event(event),
             Error(e) => panic!("tmp error remove {:?}", e),
             Empty => (),
-            _e => todo!("handle: {:?}", _e),
         }
         Command::none()
     }
@@ -143,9 +164,9 @@ impl Application for State {
     fn view(&mut self) -> Element<Event> {
         match self.page {
             Page::Login => self.login.view(),
-            Page::Join => self.can_join.view(),
+            Page::Join => self.can_join.as_mut().unwrap().view(),
             Page::Host => self.can_host.view(),
-            Page::Hosting => self.hosting.view(),
+            Page::Hosting => self.hosting.as_mut().unwrap().view(),
         }
     }
 }

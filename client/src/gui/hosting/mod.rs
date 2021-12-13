@@ -1,13 +1,20 @@
 use std::sync::Arc;
 
-use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
-pub use crate::Event as Msg;
 use super::parts::{ClearError, ErrorBar};
+use super::RpcConn;
+use crate::mc;
+pub use crate::Event as Msg;
+use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
+use protocol::HostId;
 
 mod tasks;
 
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Error {
+    #[error("Ran into problem running minecraft server: {0}")]
+    Mc(#[from] wrapper::Error),
+    #[error("No longer the host")]
+    NotHost,
 }
 
 impl From<protocol::Error> for Error {
@@ -19,7 +26,7 @@ impl From<protocol::Error> for Error {
 #[derive(Debug, Clone)]
 pub enum Event {
     ClearError(Error),
-    Handle(Arc<wrapper::Handle>),
+    Mc(Result<wrapper::parser::Line, wrapper::Error>),
     Error(Error),
 }
 
@@ -30,25 +37,29 @@ impl ClearError for Event {
     }
 }
 
-#[derive(Default)]
 pub struct Page {
     errorbar: ErrorBar<Error>,
-    server: Option<wrapper::Handle>,
+    server: wrapper::Handle,
+    host_id: HostId,
 }
 
 impl Page {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn from(server: Arc<wrapper::Handle>, host_id: HostId) -> Self {
+        Self {
+            errorbar: ErrorBar::default(),
+            server: Arc::try_unwrap(server).expect("server handle should only have one reference"),
+            host_id,
+        }
     }
 
-    pub fn update(&mut self, event: Event) -> Command<Msg> {
-        match dbg!(event) {
+    pub fn update(&mut self, event: Event, rpc: RpcConn) -> Command<Msg> {
+        match event {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
-            Event::Handle(h) => {
-                let h = Arc::try_unwrap(h).expect("could not get ownership over server handle");
-                self.server = Some(h);
-            }
+            Event::Mc(event) => match event {
+                Ok(line) => return mc::send_line(line, rpc, self.host_id),
+                Err(e) => self.errorbar.add(e.into()),
+            },
         }
         Command::none()
     }
@@ -57,16 +68,14 @@ impl Page {
         let sidebar = Space::with_width(Length::FillPortion(4));
         let left_spacer = Space::with_width(Length::FillPortion(1));
         let top_spacer = Space::with_height(Length::FillPortion(1));
-        let center_column = Column::new()
-            .push(top_spacer)
-            .push(title());
+        let center_column = Column::new().push(top_spacer).push(title());
 
         let ui = Row::new()
             .push(left_spacer)
             .push(center_column)
             .push(sidebar);
 
-        let errorbar = self.errorbar.view().map(move |e| Msg::HostingPage(e));
+        let errorbar = self.errorbar.view().map(Msg::HostingPage);
         Column::new()
             .width(Length::Fill)
             .push(errorbar)

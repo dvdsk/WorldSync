@@ -2,12 +2,14 @@ use std::thread;
 
 use client::gui;
 use iced::Application;
+use tokio::sync::mpsc;
 
 pub async fn test_server(port: u16) {
     use server::db::user::UserDb;
 
     let db = server::db::test_db();
-    let world = server::World::from(db.clone()).await;
+    let host_state = server::host::Host::new();
+    let world = server::World::from(db.clone(), host_state.clone()).await;
     let mut userdb = UserDb::from(db);
 
     use protocol::User;
@@ -19,9 +21,10 @@ pub async fn test_server(port: u16) {
     let events = server::events_channel();
     let sessions = server::Sessions::default();
 
-    let send_hb = server::send_test_hb(events.clone());
-    let server = server::host(sessions, userdb, world, port, events);
-    tokio::join!(send_hb, server);
+    let (host_req, host_req_recv) = mpsc::channel(100);
+    let monitor = server::host::monitor(host_state, events.clone(), host_req_recv);
+    let host = server::host(sessions, userdb, world, port, events, host_req);
+    tokio::join!(monitor, host);
 }
 
 fn main() {

@@ -1,6 +1,5 @@
 use shared::tarpc;
 use tarpc::client::Config;
-use crate::tarpc::context;
 
 use crate::ServiceClient;
 use tarpc::tokio_serde::formats::Bincode;

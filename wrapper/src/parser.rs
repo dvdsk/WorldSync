@@ -1,15 +1,21 @@
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
+use peg::error::ParseError;
+use peg::str::LineCol;
+use serde::{Deserialize, Serialize};
+use derivative::Derivative;
 use time::Time;
 
-#[derive(thiserror::Error, Debug, Clone, Hash, PartialEq, Eq)]
+
+#[derive(thiserror::Error, Derivative, Debug, Clone, Eq)]
+#[derivative(Hash, PartialEq)]
 pub enum Error {
-    #[error("Could not parse minecraft server output")]
-    ParsingError,
+    #[error("Could not parse minecraft server output, line: {line}, error: {error}")]
+    ParsingError{line: String, #[derivative(PartialEq="ignore", Hash="ignore")] error: ParseError<LineCol>},
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Line {
     pub time: Time,
     pub source: String,
@@ -17,21 +23,21 @@ pub struct Line {
     pub msg: Message,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Level {
     Info,
     Warn,
     Error,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Coords {
     pub x: f32,
     pub y: f32,
     pub z: f32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Exception {
     AddressInUse,
     Unknown(String),
@@ -39,7 +45,7 @@ pub enum Exception {
 
 /// only minecraft version numbers post 1.0.0 are supported
 /// versions earlier then 1.14 will end up as unknown
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Version {
     Pre(u8, u8, u8),
     ExpSnapshot(u8, u8, u8),
@@ -50,7 +56,7 @@ pub enum Version {
     Unknown,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Message {
     EulaUnaccepted,
     Joined {
@@ -71,8 +77,11 @@ pub enum Message {
     Other(String),
 }
 
+/// Incomplete parser, will return Error on non matching lines, these should be 
+/// logged or discarded by the caller
 pub fn parse(input: impl Into<String> + AsRef<str>) -> Result<Line, Error> {
-    line_parser::line(input.as_ref()).map_err(|_| Error::ParsingError)
+    line_parser::line(input.as_ref())
+        .map_err(|error| Error::ParsingError{line: input.into(), error})
 }
 
 peg::parser! {

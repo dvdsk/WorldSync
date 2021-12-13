@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 static FREE_PORT: AtomicU16 = AtomicU16::new(34879);
@@ -11,7 +12,8 @@ pub async fn test_server(port: u16) {
     use server::db::user::UserDb;
 
     let db = server::db::test_db();
-    let world = server::World::from(db.clone()).await;
+    let host_state = server::host::Host::new();
+    let world = server::World::from(db.clone(), host_state.clone()).await;
     let mut userdb = UserDb::from(db);
 
     use protocol::User;
@@ -24,7 +26,11 @@ pub async fn test_server(port: u16) {
 
     let events = server::events_channel();
     let sessions = server::Sessions::default();
-    server::host(sessions, userdb, world, port, events).await;
+
+    let (host_req, host_req_recv) = mpsc::channel(100);
+    let monitor = server::host::monitor(host_state, events.clone(), host_req_recv);
+    let host = server::host(sessions, userdb, world, port, events, host_req);
+    tokio::join!(monitor, host);
 }
 
 pub async fn test_conn(port: u16) -> protocol::ServiceClient {

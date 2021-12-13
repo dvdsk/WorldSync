@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -5,7 +6,7 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::time::timeout;
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 pub mod parser;
 
@@ -20,8 +21,6 @@ pub enum Error {
         component in path is not a directory"
     )]
     IncorrectServerPath,
-    #[error("Could not parse minecraft server output: {0}")]
-    Parser(#[from] parser::Error),
     #[error("Unknown error, multi line msg might be truncated: {0}")]
     Unknown(String),
     #[error("No jar file 'server.jar' found at: {0}")]
@@ -30,15 +29,17 @@ pub enum Error {
     OutdatedJava { required: String },
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Instance {
-    process: Child,
+    #[derivative(Debug = "ignore")]
+    _process: Child,
     working_dir: PathBuf,
     stdout: Lines<BufReader<ChildStdout>>,
     stderr: Lines<BufReader<ChildStderr>>,
 }
 
-const GC_ARGS: &[&'static str] = &[
+const GC_ARGS: &[&str] = &[
     "-Dsun.rmi.dgc.server.gcInterval=2147483646", // do not garbace collect every min
     "-XX:+UnlockExperimentalVMOptions",           // unknown but recommanded
     "-XX:G1NewSizePercent=20",                    // G1GC keep 20% of heap for new objects
@@ -83,7 +84,7 @@ impl Instance {
         let stderr = BufReader::new(wait_for(&mut child.stderr).await).lines();
 
         let instance = Self {
-            process: child,
+            _process: child,
             working_dir,
             stdout,
             stderr,
@@ -99,7 +100,10 @@ impl Instance {
                 res = self.stdout.next_line() => {
                     match res {
                         Err(e) => return Err(Error::Pipe(e.kind())),
-                        Ok(Some(line)) => return handle_stdout(line),
+                        Ok(Some(line)) => match parser::parse(line) {
+                            Ok(line) => return Ok(line),
+                            Err(e) => {debug!("{:?}", e); continue}
+                        }
                         Ok(None) => continue,
                     }
                 }
@@ -123,10 +127,6 @@ async fn wait_for<T>(source: &mut Option<T>) -> T {
         }
         sleep(Duration::from_millis(50)).await;
     }
-}
-
-fn handle_stdout(line: String) -> Result<parser::Line, Error> {
-    parser::parse(line).map_err(|e| e.into())
 }
 
 async fn collect_lines(stderr: &mut Lines<BufReader<ChildStderr>>, lines: &mut String) {
@@ -153,7 +153,7 @@ async fn handle_stderr(line: String, instance: &mut Instance) -> Error {
 
 pub struct Handle(ChildStdin);
 
-pub fn outdated_java_error(lines: &String) -> Error {
+pub fn outdated_java_error(lines: &str) -> Error {
     let start = lines.find("class file version ").unwrap();
     let stop = start + lines[start..].find(')').unwrap();
     let required = lines[start..stop].to_owned();

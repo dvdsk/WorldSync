@@ -1,6 +1,6 @@
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::gui::host::Event as hEvent;
 use futures::stream::{self, BoxStream};
@@ -13,6 +13,8 @@ use tracing::{error, info, instrument};
 
 use crate::gui::RpcConn;
 use crate::Event;
+
+pub const SERVER_PATH: &str = "server";
 
 pub fn sub(conn: RpcConn, count: usize) -> iced::Subscription<Event> {
     iced::Subscription::from_recipe(WorldDl {
@@ -45,7 +47,7 @@ pub enum Error {
     #[error("Lost connection to meta conn")]
     NoMetaConn,
     #[error("Could not access local file system, is folder read only or hard drive full?")]
-    FsError,
+    Fs,
     #[error("{0}")]
     Protocol(#[from] protocol::Error),
 }
@@ -58,13 +60,13 @@ impl From<RpcError> for Error {
 
 impl From<sync::Error> for Error {
     fn from(_: sync::Error) -> Self {
-        Error::FsError
+        Error::Fs
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(_: std::io::Error) -> Self {
-        Error::FsError
+        Error::Fs
     }
 }
 
@@ -102,12 +104,12 @@ use crate::gui::host;
 impl State {
     #[instrument(err)]
     async fn get_dir_update(&mut self) -> Result<DirUpdate, Error> {
-        if !Path::new("server").is_dir() {
-            let full_path = fs::canonicalize("server").await.unwrap();
+        if !Path::new(SERVER_PATH).is_dir() {
+            let full_path = fs::canonicalize(SERVER_PATH).await.unwrap();
             info!("created directory for server in: {:?}", full_path);
-            fs::create_dir("server").await.unwrap();
+            fs::create_dir(SERVER_PATH).await.unwrap();
         }
-        let dir_content = DirContent::from_path("server".into()).await?;
+        let dir_content = DirContent::from_dir(SERVER_PATH.into()).await?;
         let dir_update = self
             .conn
             .client
@@ -134,6 +136,7 @@ impl State {
     }
 
     // TODO improve, spawn a few tasks and run request concurrently
+    // TODO clean up empty folders
     async fn apply_updates(self) -> (Event, Self) {
         let Self {
             mut conn,
@@ -176,22 +179,40 @@ impl State {
     }
 }
 
+fn local_path(remote_path: &Path) -> PathBuf {
+    Path::new(SERVER_PATH).join(remote_path)
+}
+
 #[instrument(err)]
 async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Error> {
     match action {
-        SyncAction::Remove(path) => fs::remove_file(path).await?,
+        SyncAction::Remove(path) => {
+            fs::remove_file(local_path(&path)).await?;
+        }
         SyncAction::Replace(path, id) => {
             let bytes = download_obj(conn, id).await?;
             let mut file = fs::OpenOptions::new()
-                .truncate(true)
                 .write(true)
-                .open(path)
+                .truncate(true)
+                .open(local_path(&path))
                 .await?;
             file.write_all(&bytes).await?;
         }
         SyncAction::Add(path, id) => {
             let bytes = download_obj(conn, id).await?;
-            let mut file = fs::OpenOptions::new().create_new(true).open(path).await?;
+            if let Some(dir) = local_path(&path).parent(){
+                fs::create_dir_all(dir).await?;
+            }
+            if local_path(&path).is_dir() {
+                // take care never to remove the local_path() call
+                // this removes any files inside the path
+                fs::remove_dir_all(local_path(&path)).await?;
+            }
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(local_path(&path))
+                .await?;
             file.write_all(&bytes).await?;
         }
     }

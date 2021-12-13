@@ -42,7 +42,6 @@ pub fn setup_tracing() {
                 || m.contains("gfx_backend")
                 || m.contains("winit::platform_impl")
         };
-
         match metadata.module_path() {
             Some(module) if is_ignored(module) => false,
             _ => true,

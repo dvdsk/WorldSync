@@ -1,15 +1,17 @@
 use std::path::PathBuf;
 
 use crate::db::world::WorldDb;
+use crate::host::HostEvent;
 use sync::{DirContent, DirUpdate, ObjectId};
+use wrapper::parser::Line;
 
 use super::ConnState;
-use shared::tarpc;
-use protocol::{Host, HostId, Service, SessionId, User, UserId};
 use protocol::{Error, Event};
+use protocol::{HostDetails, HostId, HostState, Service, SessionId, User, UserId};
+use shared::tarpc;
 use tarpc::context;
 use tokio::sync::broadcast::error::RecvError;
-use tracing::{info, warn};
+use tracing::{info, instrument, warn};
 
 #[tarpc::server]
 impl Service for ConnState {
@@ -87,13 +89,9 @@ impl Service for ConnState {
         Ok(())
     }
 
-    async fn host(
-        self,
-        _: context::Context,
-        id: SessionId,
-    ) -> Result<Option<protocol::Host>, Error> {
+    async fn host(self, _: context::Context, id: SessionId) -> Result<HostState, Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
-        Ok(self.world.host())
+        Ok(self.world.host.state.read().await.clone())
     }
 
     async fn request_to_host(
@@ -102,15 +100,19 @@ impl Service for ConnState {
         id: SessionId,
         host_id: HostId,
     ) -> Result<(), Error> {
-        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
-        let host_changed = self.world.set_host(self.peer_addr, id);
-        if host_changed {
-            let host = Host {
-                addr: self.peer_addr,
-                id: host_id,
-            };
-            let _irrelevant = self.events.send(Event::NewHost(host));
-        }
+        let user_id = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        let name = self.userdb.get_name(user_id)?.unwrap();
+        let mut addr = self.peer_addr;
+        addr.set_port(25565);
+        let details = HostDetails {
+            name,
+            addr,
+            id: host_id,
+        };
+        self.host_req
+            .send(HostEvent::RequestToHost(details))
+            .await
+            .unwrap();
         Ok(())
     }
     async fn await_event(self, _: context::Context, id: SessionId) -> Result<Event, Error> {
@@ -145,6 +147,24 @@ impl Service for ConnState {
     ) -> Result<Vec<u8>, Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         Ok(WorldDb::get_object(object).await?)
+    }
+
+    #[instrument(err, skip(self))]
+    async fn pub_mc_line(self, _: context::Context, id: HostId, line: Line) -> Result<(), Error> {
+        match &*self.world.host.state.read().await {
+            HostState::Up(host) | HostState::Loading(host) => {
+                if host.id != id {
+                    return Err(Error::NotHost);
+                }
+            }
+            _ => return Err(Error::NotHost),
+        }
+
+        match HostEvent::try_from(line) {
+            Ok(event) => self.host_req.send(event).await.unwrap(),
+            Err(_) => (), // unprocessed line
+        }
+        Ok(())
     }
 
     async fn add_user(
@@ -214,12 +234,13 @@ impl Service for ConnState {
         if !self.peer_addr.ip().is_loopback() {
             return Err(Error::Unauthorized);
         }
-        
+
         if !dir.exists() {
             return Err(Error::DirDoesNotExist);
         }
 
-        self.world.dump_save(dir).await;
+        self.world.dump_save(dir.clone()).await?;
+        info!("dumped last save into: {:?}", dir);
         Ok(())
     }
 
@@ -227,12 +248,12 @@ impl Service for ConnState {
         if !self.peer_addr.ip().is_loopback() {
             return Err(Error::Unauthorized);
         }
-        
+
         if !dir.exists() {
             return Err(Error::DirDoesNotExist);
         }
 
-        self.world.load_save(dir.clone()).await?;
+        self.world.set_save(dir.clone()).await?;
         info!("set save to whatever was in: {:?}", dir);
         Ok(())
     }

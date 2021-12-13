@@ -1,3 +1,4 @@
+use core::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -28,6 +29,13 @@ pub struct WorldDb {
     db: sled::Db,
     objects: Tree<(PathBuf, u64), ObjectId>,
     saves: sled::Tree, // save by a id (saveId)
+}
+
+impl fmt::Debug for WorldDb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WorldDb")
+         .finish()
+    }
 }
 
 impl ObjectStore for WorldDb {

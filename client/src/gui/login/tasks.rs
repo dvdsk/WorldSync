@@ -1,6 +1,6 @@
 use crate::gui::{RpcConn, style};
+use protocol::HostState;
 pub use protocol::ServiceClient;
-use protocol::Host;
 use shared::tarpc;
 pub use tarpc::context;
 use tracing::instrument;
@@ -12,7 +12,7 @@ use iced::Command;
 fn parse_server_str(server_str: &str) -> Result<(String, u16), Error> {
     let (domain, port) = server_str.split_once(':').ok_or(Error::InvalidFormat)?;
     let port = port.parse().map_err(|_| Error::NotANumber)?;
-    return Ok((domain.to_owned(), port));
+    Ok((domain.to_owned(), port))
 }
 
 #[instrument(err)]
@@ -21,7 +21,7 @@ pub async fn login(
     port: u16,
     username: String,
     password: String,
-) -> Result<(RpcConn, Option<Host>), Error> {
+) -> Result<(RpcConn, HostState), Error> {
     let client = protocol::connect(&domain, port)
         .await
         .map_err(|_| Error::NoMetaConn)?;
