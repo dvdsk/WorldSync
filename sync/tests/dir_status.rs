@@ -25,13 +25,13 @@ async fn dir_with_files() {
 
     DirBuilder::new()
         .recursive(true)
-        .create("test_data/dir_with_files")
+        .create("test_data/dir_with_files/subdir")
         .unwrap();
 
     let test_paths = [
-        "test_data/dir_with_files/world1_mca.mca",
+        "test_data/dir_with_files/subdir/applesaus",
         "test_data/dir_with_files/foo.txt",
-        "test_data/dir_with_files/applesaus",
+        "test_data/dir_with_files/world1_mca.mca",
     ];
     for path in test_paths {
         let mut file = File::create(path).unwrap();
@@ -44,15 +44,15 @@ async fn dir_with_files() {
 
     let mut correct = DirContent(vec![
         FileStatus {
-            path: PathBuf::from("dir_with_files/applesaus"),
+            path: PathBuf::from("subdir/applesaus"),
             hash: 469007863229145464,
         },
         FileStatus {
-            path: PathBuf::from("dir_with_files/foo.txt"),
+            path: PathBuf::from("foo.txt"),
             hash: 469007863229145464,
         },
         FileStatus {
-            path: PathBuf::from("dir_with_files/world1_mca.mca"),
+            path: PathBuf::from("world1_mca.mca"),
             hash: 469007863229145464,
         },
     ]);
