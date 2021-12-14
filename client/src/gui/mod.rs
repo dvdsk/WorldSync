@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{events, mc, world_dl, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
@@ -33,6 +35,7 @@ pub struct State {
     server_events: bool,
     downloading_world: SubStatus,
     mc_server: SubStatus,
+    save_periodically: SubStatus,
 }
 
 impl State {
@@ -48,6 +51,7 @@ impl State {
             server_events: false,
             downloading_world: SubStatus::default(),
             mc_server: SubStatus::default(),
+            save_periodically: SubStatus::default(),
         }
     }
 }
@@ -85,11 +89,7 @@ impl Application for State {
             HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
             HostingPage(event) => {
                 let rpc = self.unwrap_rpc();
-                return self
-                    .hosting
-                    .as_mut()
-                    .unwrap()
-                    .update(event, rpc)
+                return self.hosting.as_mut().unwrap().update(event, rpc);
             }
             LoggedIn(rpc, host_state) => {
                 use HostState::*;
@@ -128,12 +128,12 @@ impl Application for State {
                         .update(host::Event::Mc(event), self.unwrap_rpc())
                 }
                 Page::Hosting => {
-                let rpc = self.unwrap_rpc();
+                    let rpc = self.unwrap_rpc();
                     return self
                         .hosting
                         .as_mut()
                         .unwrap()
-                        .update(hosting::Event::Mc(event), rpc)
+                        .update(hosting::Event::Mc(event), rpc);
                 }
                 _ => panic!("should not recieve server events on other page"),
             },
@@ -147,7 +147,7 @@ impl Application for State {
     fn subscription(&self) -> Subscription<Event> {
         let mut subs = Vec::new();
         if self.server_events {
-            let rpc = self.rpc.as_ref().unwrap().clone();
+            let rpc = self.unwrap_rpc().clone();
             subs.push(events::sub_to_server(rpc))
         }
         if let Some(id) = self.downloading_world.active() {
@@ -156,6 +156,11 @@ impl Application for State {
         }
         if let Some(_id) = self.mc_server.active() {
             subs.push(mc::sub())
+        }
+        if let Some(_id) = self.save_periodically.active() {
+            let save_event = |_| Event::HostingPage(hosting::Event::PeriodicSave);
+            let periodic = iced::time::every(Duration::from_secs(5 * 60)).map(save_event);
+            subs.push(periodic)
         }
 
         Subscription::batch(subs)

@@ -45,7 +45,10 @@ impl State {
                     .can_host
                     .update(host::Event::Loading(p), self.unwrap_rpc())
             }
-            HostLoaded if self.page == Page::Host => self.page = Page::Hosting,
+            HostLoaded if self.page == Page::Host => {
+                self.save_periodically.start();
+                self.page = Page::Hosting;
+            }
             NewHost(host) => match self.can_host.is_us(&host) {
                 true => {
                     info!("attempting to host");

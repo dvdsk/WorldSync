@@ -15,6 +15,8 @@ pub enum Error {
     Mc(#[from] wrapper::Error),
     #[error("No longer the host")]
     NotHost,
+    #[error("Minecraft could not save the world, is folder read only or is there no more storage left?")]
+    McSaveErr(#[from] wrapper::HandleError),
 }
 
 impl From<protocol::Error> for Error {
@@ -27,6 +29,7 @@ impl From<protocol::Error> for Error {
 pub enum Event {
     ClearError(Error),
     Mc(Result<wrapper::parser::Line, wrapper::Error>),
+    PeriodicSave,
     Error(Error),
 }
 
@@ -39,7 +42,7 @@ impl ClearError for Event {
 
 pub struct Page {
     errorbar: ErrorBar<Error>,
-    server: wrapper::Handle,
+    mc_handle: wrapper::Handle,
     host_id: HostId,
 }
 
@@ -47,7 +50,7 @@ impl Page {
     pub fn from(server: Arc<wrapper::Handle>, host_id: HostId) -> Self {
         Self {
             errorbar: ErrorBar::default(),
-            server: Arc::try_unwrap(server).expect("server handle should only have one reference"),
+            mc_handle: Arc::try_unwrap(server).expect("server handle should only have one reference"),
             host_id,
         }
     }
@@ -56,6 +59,7 @@ impl Page {
         match event {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
+            Event::PeriodicSave => return self.save_world(),
             Event::Mc(event) => match event {
                 Ok(line) => return mc::send_line(line, rpc, self.host_id),
                 Err(e) => self.errorbar.add(e.into()),
