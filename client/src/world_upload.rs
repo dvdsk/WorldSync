@@ -203,6 +203,7 @@ impl State {
             Ok(_) => hEvent::SaveRegisterd,
             Err(e) => hEvent::Error(e.into()),
         };
+        self.phase = Phase::End;
 
         (Event::HostingPage(event), self)
     }
