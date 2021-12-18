@@ -77,7 +77,11 @@ impl Page {
         match event {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
-            Event::PeriodicSave => return self.save_world(),
+            Event::PeriodicSave => {
+                if self.uploading_sub.active().is_none() {
+                    return self.save_world();
+                }
+            }
             Event::Mc(event) => match event {
                 Ok(line) => return self.handle_server_line(line, self.rpc.clone()),
                 Err(e) => self.errorbar.add(e.into()),

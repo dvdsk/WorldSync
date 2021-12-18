@@ -96,7 +96,7 @@ where
         Box::pin(stream::unfold(
             State {
                 conn: self.conn.replace(None).unwrap(),
-                phase: dbg!(Phase::Started),
+                phase: Phase::Started,
                 host_id: self.host_id.take().unwrap(),
                 object_list: None,
                 save: None,
@@ -118,7 +118,7 @@ impl State {
     async fn do_build_updatelist(&mut self) -> Result<(Save, UpdateList), Error> {
         use crate::world_dl::SERVER_PATH;
         let dir =
-            dbg!(DirContent::from_dir(SERVER_PATH.into()).await).map_err(|_| Error::SyncError)?;
+            DirContent::from_dir(SERVER_PATH.into()).await.map_err(|_| Error::SyncError)?;
         Ok(self
             .conn
             .client
@@ -131,7 +131,7 @@ impl State {
         let event = match self.do_build_updatelist().await {
             Ok((save, list)) => {
                 let num_obj = list.0.len();
-                self.object_list = Some(dbg!(list));
+                self.object_list = Some(list);
                 self.save = Some(save);
                 self.phase = Phase::Uploading;
                 hosting::Event::UploadStarting(num_obj)
@@ -169,7 +169,7 @@ impl State {
 
     #[instrument(err)]
     async fn upload_obj(&mut self, obj_id: ObjectId, path: &Path) -> Result<(), Error> {
-        let bytes = fs::read(local_path(dbg!(path))).await?;
+        let bytes = fs::read(local_path(path)).await?;
         let bytes = self
             .conn
             .client

@@ -21,15 +21,12 @@ impl Page {
     }
 
     pub fn handle_server_line(&mut self, line: Line, rpc: RpcConn) -> Command<Msg> {
-        dbg!(&line);
         match line {
             Line {
                 msg: wrapper::Message::Saved,
                 ..
             } => {
-                if self.uploading_sub.active().is_none() {
-                    self.uploading_sub.start();
-                }
+                self.uploading_sub.start();
                 Command::none()
             }
             _ => super::mc::send_line(line, rpc, self.host_id),
