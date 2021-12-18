@@ -88,6 +88,7 @@ async fn state_machine(state: State) -> Option<(Event, State)> {
 async fn send(line: wrapper::parser::Line, rpc: RpcConn, host_id: HostId) -> crate::Event {
     use crate::gui::hosting::Event as hEvent;
     use crate::gui::hosting::Error as hError;
+
     let res = rpc
         .client
         .pub_mc_line(Context::current(), host_id, line)

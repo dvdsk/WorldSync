@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::db::world::WorldDb;
 use crate::host::HostEvent;
-use sync::{DirContent, DirUpdate, ObjectId};
+use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
 use wrapper::parser::Line;
 
 use super::ConnState;
@@ -139,6 +139,32 @@ impl Service for ConnState {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         Ok(self.world.get_update(dir))
     }
+    async fn new_save(
+        self,
+        _: context::Context,
+        id: SessionId,
+        host_id: HostId,
+        dir: DirContent,
+    ) -> Result<(Save, UpdateList), Error> {
+        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        let _ = self.is_host(host_id).await?;
+        Ok(self.world.new_save(dir))
+    }
+
+    async fn register_save(
+        self,
+        _: context::Context,
+        id: SessionId,
+        host_id: HostId,
+        save: Save,
+    ) -> Result<(), Error> {
+        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        let _ = self.is_host(host_id).await?;
+
+        self.world.register_save(save);
+        Ok(())
+    }
+
     async fn get_object(
         self,
         _: context::Context,
@@ -147,6 +173,19 @@ impl Service for ConnState {
     ) -> Result<Vec<u8>, Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         Ok(WorldDb::get_object(object).await?)
+    }
+
+    async fn put_object(
+        self,
+        _: context::Context,
+        id: SessionId,
+        host_id: HostId,
+        object: ObjectId,
+        bytes: Vec<u8>,
+    ) -> Result<(), Error> {
+        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        let _ = self.is_host(host_id).await?;
+        Ok(self.world.add_obj(object, &bytes).await?)
     }
 
     #[instrument(err, skip(self))]

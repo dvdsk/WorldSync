@@ -12,7 +12,7 @@ use tracing::{debug, instrument};
 
 pub mod parser;
 mod config;
-pub use parser::Line;
+pub use parser::{Line, Message};
 pub use config::Config;
 
 #[derive(Clone, Debug, thiserror::Error, Hash, PartialEq, Eq)]

@@ -64,6 +64,8 @@ enum Page {
     Join,
 }
 
+type SubsList = Vec<Subscription<events::Event>>;
+
 impl Application for State {
     type Executor = executor::Default;
     type Message = Event;
@@ -74,7 +76,7 @@ impl Application for State {
     }
 
     fn title(&self) -> String {
-        String::from("A cool application")
+        String::from("WorldSync")
     }
 
     fn update(
@@ -88,8 +90,7 @@ impl Application for State {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
             HostingPage(event) => {
-                let rpc = self.unwrap_rpc();
-                return self.hosting.as_mut().unwrap().update(event, rpc);
+                return self.hosting.as_mut().unwrap().update(event);
             }
             LoggedIn(rpc, host_state) => {
                 use HostState::*;
@@ -119,7 +120,7 @@ impl Application for State {
                     .update(host::Event::WorldUpdated, self.unwrap_rpc());
             }
             McHandle(handle) => {
-                self.hosting = Some(hosting::Page::from(handle, self.can_host.host_id.unwrap()))
+                self.hosting = Some(hosting::Page::from(handle, self.can_host.host_id.unwrap(), self.unwrap_rpc().clone()))
             }
             Mc(event) => match self.page {
                 Page::Host => {
@@ -128,12 +129,11 @@ impl Application for State {
                         .update(host::Event::Mc(event), self.unwrap_rpc())
                 }
                 Page::Hosting => {
-                    let rpc = self.unwrap_rpc();
                     return self
                         .hosting
                         .as_mut()
                         .unwrap()
-                        .update(hosting::Event::Mc(event), rpc);
+                        .update(hosting::Event::Mc(event));
                 }
                 _ => panic!("should not recieve server events on other page"),
             },
@@ -146,12 +146,16 @@ impl Application for State {
 
     fn subscription(&self) -> Subscription<Event> {
         let mut subs = Vec::new();
+        if let Some(hosting) = &self.hosting {
+            hosting.add_subs(&mut subs);
+        }
+
         if self.server_events {
             let rpc = self.unwrap_rpc().clone();
             subs.push(events::sub_to_server(rpc))
         }
         if let Some(id) = self.downloading_world.active() {
-            let rpc = self.rpc.as_ref().unwrap().clone();
+            let rpc = self.unwrap_rpc().clone();
             subs.push(world_dl::sub(rpc, id))
         }
         if let Some(_id) = self.mc_server.active() {
@@ -159,7 +163,7 @@ impl Application for State {
         }
         if let Some(_id) = self.save_periodically.active() {
             let save_event = |_| Event::HostingPage(hosting::Event::PeriodicSave);
-            let periodic = iced::time::every(Duration::from_secs(5 * 60)).map(save_event);
+            let periodic = iced::time::every(Duration::from_secs(1 * 60)).map(save_event);
             subs.push(periodic)
         }
 

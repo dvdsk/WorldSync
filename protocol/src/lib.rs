@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use sync::{DirContent, DirUpdate, ObjectId};
+use sync::{DirContent, DirUpdate, ObjectId, UpdateList, Save};
 use wrapper::parser::Line;
 
 use serde::{Deserialize, Serialize};
@@ -126,7 +126,10 @@ pub trait Service {
     async fn host(id: SessionId) -> Result<HostState, Error>;
     async fn request_to_host(id: SessionId, host_id: HostId) -> Result<(), Error>;
     async fn dir_update(id: SessionId, dir: DirContent) -> Result<DirUpdate, Error>;
+    async fn new_save(id: SessionId, host_id: HostId, dir: DirContent) -> Result<(Save, UpdateList), Error>;
+    async fn register_save(id: SessionId, host_id: HostId, save: Save) -> Result<(), Error>;
     async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
+    async fn put_object(id: SessionId, host_id: HostId, object: ObjectId, bytes: Vec<u8>) -> Result<(), Error>;
     async fn pub_mc_line(id: HostId, line: Line) -> Result<(), Error>;
 
     async fn add_user(user: User, password: String) -> Result<(), Error>;
