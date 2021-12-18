@@ -7,6 +7,7 @@ use tokio::io::AsyncReadExt;
 use tokio::task;
 use tracing::instrument;
 use walkdir::WalkDir;
+pub use seahash::hash;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Object {
@@ -95,7 +96,7 @@ pub enum SyncAction {
 pub struct ObjectId(pub u64);
 /// list of (relative) paths on the remote that need to be uploaded
 /// and the objectid they should be assigned
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateList(pub Vec<(ObjectId, PathBuf)>);
 
 /// list of actions needed to get a local directory

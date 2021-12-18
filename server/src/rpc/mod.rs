@@ -1,7 +1,7 @@
 use crate::db::user::UserDb;
 use crate::host::HostEvent;
 use crate::{Sessions, World};
-use protocol::{Event, SessionId, UserId};
+use protocol::{Error, Event, HostId, SessionId, UserId};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
@@ -28,5 +28,8 @@ impl ConnState {
     pub fn add_session(&mut self, id: UserId) -> SessionId {
         let backlog = self.events.subscribe();
         self.sessions.add(id, backlog)
+    }
+    pub async fn is_host(&self, id: HostId) -> Result<(), Error> {
+        self.world.is_host(id).await.map_err(|_| Error::NotHost)
     }
 }

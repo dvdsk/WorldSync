@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use protocol::HostState;
-use sync::{DirContent, DirUpdate, UpdateList};
+use protocol::{HostState, HostId};
+use sync::{DirContent, DirUpdate, UpdateList, Save, ObjectId};
 use tracing::{info, instrument};
 use typed_sled::sled;
 
@@ -53,6 +53,27 @@ impl World {
         Ok(())
     }
 
+    pub async fn is_host(&self, id: HostId) -> Result<(),()> {
+        match &*self.host.state.read().await {
+            HostState::Up(host) | HostState::Loading(host) => {
+                if host.id != id {
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Err(()),
+        }
+    }
+
+    pub fn new_save(&self, content: DirContent) -> (Save, UpdateList) {
+        UpdateList::for_new_save(&self.db, content)
+    }
+
+    pub fn register_save(&self, save: Save) {
+        self.db.push_save(save);
+    }
+
     pub async fn set_save(&self, source: PathBuf) -> Result<(), protocol::Error> {
         match *self.host.state.read().await {
             HostState::NoHost => (),
@@ -64,11 +85,15 @@ impl World {
         for (object_id, path) in update_list.0 {
             let full_path = source.join(path);
             let bytes = tokio::fs::read(full_path).await.unwrap();
-            WorldDb::add_obj(object_id, &bytes).await?;
+            self.add_obj(object_id, &bytes).await?;
         }
         self.db.push_save(new_save);
         info!("loaded and set save from: {:?}", source);
 
         Ok(())
+    }
+
+    pub async fn add_obj(&self, id: ObjectId, bytes: &[u8]) -> Result<(), protocol::Error> {
+        Ok(self.db.add_obj(id, bytes).await?)
     }
 }

@@ -9,14 +9,14 @@ use tracing::{error, info};
 async fn unreachable(addr: SocketAddr) {
     use async_minecraft_ping::ConnectionConfig;
     async fn inner(addr: SocketAddr) -> Result<(), ()> {
-        let mut conn = ConnectionConfig::build(addr.ip().to_string())
-            .with_port(addr.port())
-            .connect()
-            .await
-            .map_err(|_| ())?;
         loop {
-            sleep(Duration::from_secs( 20)).await;
-            conn.status().await.map_err(|_| ())?;
+            sleep(Duration::from_secs(5)).await;
+            let _status = ConnectionConfig::build(addr.ip().to_string())
+                .with_port(addr.port())
+                .connect()
+                .await
+                .map_err(|_| ())?
+                .status().await;
         }
     }
 
@@ -30,7 +30,7 @@ async fn reachable(addr: SocketAddr) {
         .connect()
         .await
     {
-        sleep(Duration::from_secs(5 * 60)).await;
+        sleep(Duration::from_secs(5)).await;
     }
 }
 
@@ -147,10 +147,7 @@ async fn shutdown_or_unreachable(
     }
 }
 
-async fn up_or_timeout(
-    host: HostDetails,
-    broadcast: &mut BroadCast,
-) -> HostState {
+async fn up_or_timeout(host: HostDetails, broadcast: &mut BroadCast) -> HostState {
     match time::timeout(Duration::from_secs(5 * 60), reachable(host.addr)).await {
         Ok(_) => {
             let _irrelevant = broadcast.send(Event::HostRestored);

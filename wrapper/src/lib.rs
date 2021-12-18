@@ -1,14 +1,19 @@
 use derivative::Derivative;
+use tokio::sync::Mutex;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, BufReader, Lines};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::time::timeout;
 use tracing::{debug, instrument};
 
 pub mod parser;
+mod config;
+pub use parser::{Line, Message};
+pub use config::Config;
 
 #[derive(Clone, Debug, thiserror::Error, Hash, PartialEq, Eq)]
 pub enum Error {
@@ -89,7 +94,7 @@ impl Instance {
             stdout,
             stderr,
         };
-        let handle = Handle(stdin);
+        let handle = Handle::from(stdin);
         Ok((instance, handle))
     }
 
@@ -151,7 +156,28 @@ async fn handle_stderr(line: String, instance: &mut Instance) -> Error {
     }
 }
 
-pub struct Handle(ChildStdin);
+#[derive(Clone)]
+pub struct Handle(Arc<Mutex<ChildStdin>>);
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, thiserror::Error)]
+pub enum HandleError {
+    #[error("Could not write to minecraft server")]
+    Io(String),
+}
+
+impl Handle {
+    pub fn from(stdin: ChildStdin) -> Self {
+        Self(Arc::new(Mutex::new(stdin)))
+    }
+    pub async fn save(&mut self) -> Result<(), HandleError> {
+        self.0.lock().await
+            .write_all(b"/save-all\n")
+            .await
+            .map_err(|e| e.to_string())
+            .map_err(HandleError::Io)?;
+        Ok(())
+    }
+}
 
 pub fn outdated_java_error(lines: &str) -> Error {
     let start = lines.find("class file version ").unwrap();

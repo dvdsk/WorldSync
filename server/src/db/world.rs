@@ -33,8 +33,7 @@ pub struct WorldDb {
 
 impl fmt::Debug for WorldDb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("WorldDb")
-         .finish()
+        f.debug_struct("WorldDb").finish()
     }
 }
 
@@ -93,14 +92,19 @@ impl WorldDb {
     }
 
     #[instrument(err)]
-    pub async fn add_obj(id: ObjectId, bytes: &[u8]) -> Result<(), Error> {
+    pub async fn add_obj(&self, id: ObjectId, bytes: &[u8]) -> Result<(), Error> {
         let mut path = Self::obj_path().to_owned();
         path.push(id.0.to_string());
-        dbg!(bytes.len());
 
         fs::write(&path, bytes)
             .await
-            .map_err(|e| Error::CantWriteObj(e.kind(), path))
+            .map_err(|e| Error::CantWriteObj(e.kind(), path.clone()))?;
+        let key = (path, sync::hash(bytes));
+        self.objects
+            .compare_and_swap(&key, None, Some(&id))
+            .unwrap()
+            .expect("object should not yet exist in db");
+        Ok(())
     }
 
     pub fn get_update_list(&self, dir: DirContent) -> DirUpdate {
