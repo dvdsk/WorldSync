@@ -30,7 +30,9 @@ pub async fn test_server(port: u16) {
     let (host_req, host_req_recv) = mpsc::channel(100);
     let monitor = server::host::monitor(host_state, events.clone(), host_req_recv);
     let host = server::host(sessions, userdb, world, port, events, host_req);
-    tokio::join!(monitor, host);
+    tokio::spawn(async move {
+        tokio::join!(monitor, host);
+    }).await.unwrap();
 }
 
 pub async fn test_conn(port: u16) -> protocol::ServiceClient {
