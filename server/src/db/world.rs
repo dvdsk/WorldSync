@@ -2,7 +2,7 @@ use core::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save};
+use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save, StoreKey};
 use tokio::fs;
 use tracing::instrument;
 use typed_sled::{sled, Tree};
@@ -13,6 +13,8 @@ pub enum Error {
     CantReadObj(io::ErrorKind, PathBuf),
     #[error("Coud not write obj: {1}, ran into error: {0:?}")]
     CantWriteObj(io::ErrorKind, PathBuf),
+    #[error("Object was already present: {0:?}")]
+    ObjectAlreadyPresent(#[from] typed_sled::CompareAndSwapError<ObjectId>),
 }
 
 impl From<Error> for protocol::Error {
@@ -20,6 +22,7 @@ impl From<Error> for protocol::Error {
         match e {
             Error::CantReadObj(_, _) => protocol::Error::Internal,
             Error::CantWriteObj(_, _) => protocol::Error::Internal,
+            Error::ObjectAlreadyPresent(_) => protocol::Error::Internal,
         }
     }
 }
@@ -27,7 +30,7 @@ impl From<Error> for protocol::Error {
 #[derive(Clone)]
 pub struct WorldDb {
     db: sled::Db,
-    objects: Tree<(PathBuf, u64), ObjectId>,
+    objects: Tree<StoreKey, ObjectId>,
     saves: sled::Tree, // save by a id (saveId)
 }
 
@@ -37,14 +40,43 @@ impl fmt::Debug for WorldDb {
     }
 }
 
+use async_trait::async_trait;
+#[async_trait]
 impl ObjectStore for WorldDb {
+    type Error = Error;
     fn new_obj_id(&self) -> ObjectId {
         let id = self.db.generate_id().unwrap();
         ObjectId(id)
     }
-    fn contains(&self, file: &Path, hash: u64) -> Option<ObjectId> {
-        let key = (file.to_owned(), hash);
-        self.objects.get(&key).unwrap()
+    fn contains(&self, key: &StoreKey) -> Option<ObjectId> {
+        self.objects.get(key).unwrap()
+    }
+    async fn store_obj(
+        &self,
+        id: ObjectId,
+        path: PathBuf,
+        bytes: &[u8],
+    ) -> Result<(), Self::Error> {
+        let obj_path = Self::obj_path(id);
+        fs::write(&obj_path, bytes)
+            .await
+            .map_err(|e| Error::CantWriteObj(e.kind(), obj_path))?;
+
+        let key = StoreKey::calc_from(path, bytes);
+        self.objects
+            .compare_and_swap(&key, None, Some(&id))
+            .unwrap()?;
+        self.objects.flush_async().await.unwrap();
+        Ok(())
+    }
+    fn store_path() -> &'static Path {
+        Path::new("object-store")
+    }
+    async fn retrieve_obj(id: ObjectId) -> Result<Vec<u8>, Self::Error> {
+        let path = Self::obj_path(id);
+        fs::read(&path)
+            .await
+            .map_err(|e| Error::CantReadObj(e.kind(), path))
     }
 }
 
@@ -52,8 +84,8 @@ impl WorldDb {
     pub async fn from(db: sled::Db) -> Self {
         let objects = Tree::open(&db, "objects");
         let saves = db.open_tree("saves").unwrap();
-        if !Self::obj_path().exists() {
-            fs::create_dir(Self::obj_path()).await.unwrap();
+        if !Self::store_path().exists() {
+            fs::create_dir(Self::store_path()).await.unwrap();
         }
 
         WorldDb { objects, db, saves }
@@ -77,34 +109,14 @@ impl WorldDb {
         self.saves.insert(key, bytes).unwrap();
     }
 
-    pub fn obj_path() -> &'static Path {
-        Path::new("object_store")
-    }
-
     #[instrument(err)]
     pub async fn get_object(id: ObjectId) -> Result<Vec<u8>, Error> {
-        let mut path = Self::obj_path().to_owned();
-        path.push(id.0.to_string());
-
-        fs::read(&path)
-            .await
-            .map_err(|e| Error::CantReadObj(e.kind(), path))
+        Self::retrieve_obj(id).await
     }
 
     #[instrument(err)]
-    pub async fn add_obj(&self, id: ObjectId, bytes: &[u8]) -> Result<(), Error> {
-        let mut path = Self::obj_path().to_owned();
-        path.push(id.0.to_string());
-
-        fs::write(&path, bytes)
-            .await
-            .map_err(|e| Error::CantWriteObj(e.kind(), path.clone()))?;
-        let key = (path, sync::hash(bytes));
-        self.objects
-            .compare_and_swap(&key, None, Some(&id))
-            .unwrap()
-            .expect("object should not yet exist in db");
-        Ok(())
+    pub async fn add_obj(&self, id: ObjectId, path: PathBuf, bytes: &[u8]) -> Result<(), Error> {
+        self.store_obj(id, path, bytes).await
     }
 
     pub fn get_update_list(&self, dir: DirContent) -> DirUpdate {

@@ -181,11 +181,12 @@ impl Service for ConnState {
         id: SessionId,
         host_id: HostId,
         object: ObjectId,
+        path: PathBuf,
         bytes: Vec<u8>,
     ) -> Result<(), Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let _ = self.is_host(host_id).await?;
-        Ok(self.world.add_obj(object, &bytes).await?)
+        Ok(self.world.add_obj(object, path, &bytes).await?)
     }
 
     #[instrument(err, skip(self))]

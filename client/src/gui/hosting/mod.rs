@@ -1,8 +1,8 @@
 use super::parts::{ClearError, ErrorBar, Loading};
-use super::{RpcConn, SubsList};
 use super::tasks::SubStatus;
-use crate::{mc, world_upload};
+use super::{RpcConn, SubsList};
 pub use crate::Event as Msg;
+use crate::{mc, world_upload};
 use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
 use protocol::HostId;
 use std::sync::Arc;
@@ -138,7 +138,10 @@ fn title() -> Text {
 
 fn last_save(at: Option<Instant>) -> Text {
     let text = match at {
-        Some(instant) => format!("last save at: {:?}", instant.elapsed()),
+        Some(instant) => {
+            let minutes = instant.elapsed() / 60;
+            format!("last save {:?} minutes ago", minutes)
+        }
         None => "no save made yet".to_string(),
     };
     Text::new(text)

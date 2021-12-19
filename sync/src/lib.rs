@@ -1,4 +1,5 @@
 use futures::future::join_all;
+pub use seahash::hash;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -7,7 +8,6 @@ use tokio::io::AsyncReadExt;
 use tokio::task;
 use tracing::instrument;
 use walkdir::WalkDir;
-pub use seahash::hash;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Object {
@@ -34,6 +34,8 @@ impl Save {
     pub fn objects(&self) -> &Vec<Object> {
         &self.0
     }
+    /// given a remote directorys content return the changes needed to
+    /// turn the remote into this save
     pub fn needed_update(&self, remote: DirContent) -> DirUpdate {
         use SyncAction::*;
 
@@ -56,17 +58,51 @@ impl Save {
     }
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoreKey {
+    pub path: PathBuf,
+    pub hash: u64,
+}
+impl StoreKey {
+    pub fn from(path: PathBuf, hash: u64) -> Self {
+        Self { path, hash }
+    }
+    pub fn calc_from(path: PathBuf, bytes: &[u8]) -> Self {
+        let hash = hash(bytes);
+        Self::from(path, hash)
+    }
+}
+
+use async_trait::async_trait;
+#[async_trait]
 pub trait ObjectStore {
-    fn contains(&self, file: &Path, hash: u64) -> Option<ObjectId>;
+    type Error;
     fn new_obj_id(&self) -> ObjectId;
+    fn contains(&self, key: &StoreKey) -> Option<ObjectId>;
+    async fn store_obj(
+        &self,
+        id: ObjectId,
+        path: PathBuf,
+        bytes: &[u8],
+    ) -> Result<(), Self::Error>;
+    async fn retrieve_obj(id: ObjectId) -> Result<Vec<u8>, Self::Error>;
+    fn store_path() -> &'static Path;
+    fn obj_path(id: ObjectId) -> PathBuf {
+        let mut path = Self::store_path().to_owned();
+        path.push(id.0.to_string());
+        path
+    }
 }
 
 impl UpdateList {
+    /// return the Save and determine the objects we need to add to be able
+    /// to load the save later
     pub fn for_new_save(store: &impl ObjectStore, remote: DirContent) -> (Save, UpdateList) {
         let mut new_objects = Vec::new();
         let mut new_save = Vec::new();
         for file in remote.0 {
-            let obj_id = match store.contains(&file.path, file.hash) {
+            let key = StoreKey::from(file.path.clone(), file.hash);
+            let obj_id = match store.contains(&key) {
                 Some(obj_id) => obj_id,
                 None => {
                     let id = store.new_obj_id();

@@ -41,7 +41,7 @@ async fn setup_server(dir: &Path, port: u16) {
 async fn start_fresh_server() {
     shared::setup_tracing();
 
-    let server_path = Path::new("tests/data/fail_to_start");
+    let server_path = Path::new("tests/data/start_fresh");
     setup_server(server_path, 12387).await;
 
     let (mut instance, _handle) = Instance::start(server_path, 1).await.unwrap();

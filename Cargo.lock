@@ -2789,6 +2789,7 @@ name = "server"
 version = "0.1.0"
 dependencies = [
  "async-minecraft-ping",
+ "async-trait",
  "bincode",
  "dialoguer",
  "futures",
@@ -3052,6 +3053,7 @@ dependencies = [
 name = "sync"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "futures",
  "seahash",
  "serde",
