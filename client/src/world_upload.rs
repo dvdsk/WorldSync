@@ -130,7 +130,7 @@ impl State {
     async fn build_updatelist(mut self) -> (Event, Self) {
         let event = match self.do_build_updatelist().await {
             Ok((save, list)) => {
-                let num_obj = list.0.len();
+                let num_obj = dbg!(list.0.len());
                 self.object_list = Some(list);
                 self.save = Some(save);
                 self.phase = Phase::Uploading;
@@ -178,6 +178,7 @@ impl State {
                 self.conn.session,
                 self.host_id,
                 obj_id,
+                path.to_owned(),
                 bytes,
             )
             .await??;

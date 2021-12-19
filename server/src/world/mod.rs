@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use protocol::{HostState, HostId};
-use sync::{DirContent, DirUpdate, UpdateList, Save, ObjectId};
+use sync::{DirContent, DirUpdate, UpdateList, Save, ObjectId, ObjectStore};
 use tracing::{info, instrument};
 use typed_sled::sled;
 
@@ -43,8 +43,7 @@ impl World {
 
         let save = self.db.last_save();
         for sync::Object { org_path, id, .. } in save.objects() {
-            let mut source = WorldDb::obj_path().to_owned();
-            source.push(id.0.to_string());
+            let source = WorldDb::obj_path(*id);
             let mut target = target.clone();
             target.push(org_path);
             tokio::fs::copy(source, target).await.unwrap();
@@ -83,9 +82,9 @@ impl World {
         let content = DirContent::from_dir(source.clone()).await.unwrap();
         let (new_save, update_list) = UpdateList::for_new_save(&self.db, content);
         for (object_id, path) in update_list.0 {
-            let full_path = source.join(path);
+            let full_path = source.join(&path);
             let bytes = tokio::fs::read(full_path).await.unwrap();
-            self.add_obj(object_id, &bytes).await?;
+            self.add_obj(object_id, path, &bytes).await?;
         }
         self.db.push_save(new_save);
         info!("loaded and set save from: {:?}", source);
@@ -93,7 +92,7 @@ impl World {
         Ok(())
     }
 
-    pub async fn add_obj(&self, id: ObjectId, bytes: &[u8]) -> Result<(), protocol::Error> {
-        Ok(self.db.add_obj(id, bytes).await?)
+    pub async fn add_obj(&self, id: ObjectId, path: PathBuf, bytes: &[u8]) -> Result<(), protocol::Error> {
+        Ok(self.db.add_obj(id, path, bytes).await?)
     }
 }

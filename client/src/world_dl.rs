@@ -109,13 +109,13 @@ impl State {
             info!("created directory for server in: {:?}", full_path);
             fs::create_dir(SERVER_PATH).await.unwrap();
         }
-        let dir_content = DirContent::from_dir(SERVER_PATH.into()).await?;
+        let dir_content = dbg!(DirContent::from_dir(SERVER_PATH.into()).await?);
         let dir_update = self
             .conn
             .client
             .dir_update(context::current(), self.conn.session, dir_content)
             .await??;
-        Ok(dir_update)
+        Ok(dbg!(dir_update))
     }
 
     async fn await_dir_update(mut self) -> (Event, Self) {
@@ -135,7 +135,6 @@ impl State {
         (event, self)
     }
 
-    // TODO improve, spawn a few tasks and run request concurrently
     // TODO clean up empty folders
     async fn apply_updates(self) -> (Event, Self) {
         let Self {
