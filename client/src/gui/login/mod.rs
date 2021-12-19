@@ -106,7 +106,7 @@ pub struct Page {
 impl Page {
     pub fn new() -> Self {
         Self {
-            #[cfg(not(deployed))]
+            #[cfg(not(feature = "deployed"))]
             inputs: Inputs {
                 server: Input {
                     value: "127.0.0.1:8080".to_owned(),

@@ -61,6 +61,7 @@ impl State {
                 }
             },
             HostDropped | HostCanceld | HostShutdown => self.page = Page::Host,
+            #[cfg(not(feature = "deployed"))]
             TestHB(n) => info!("recieved hb {}", n),
             _e => if let Some(p) = self.can_join.as_mut() {
                 p.host_state = _e.into()
