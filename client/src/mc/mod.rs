@@ -10,8 +10,7 @@ use tracing::info;
 use wrapper::Instance;
 
 use crate::gui::RpcConn;
-use crate::world_dl::SERVER_PATH;
-use crate::Event;
+use crate::{Event, SERVER_PATH};
 
 // pub mod server;
 pub fn sub() -> iced::Subscription<Event> {

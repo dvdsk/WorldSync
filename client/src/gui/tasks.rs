@@ -7,7 +7,8 @@ use crate::Event;
 use super::{RpcConn, State};
 
 pub fn open_settings() -> sled::Db {
-    const DB_PATH: &str = "worldsync";
+    use crate::DB_PATH;
+    fs::create_dir_all(DB_PATH).unwrap();
     match sled::open(DB_PATH) {
         Ok(db) => db,
         Err(_) => {

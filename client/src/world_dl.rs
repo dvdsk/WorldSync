@@ -12,9 +12,7 @@ use tokio::io::AsyncWriteExt;
 use tracing::{error, info, instrument};
 
 use crate::gui::RpcConn;
-use crate::Event;
-
-pub const SERVER_PATH: &str = "server";
+use crate::{Event, SERVER_PATH};
 
 pub fn sub(conn: RpcConn, count: usize) -> iced::Subscription<Event> {
     iced::Subscription::from_recipe(WorldDl {
