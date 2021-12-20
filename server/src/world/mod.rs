@@ -80,11 +80,14 @@ impl World {
         }
 
         let content = DirContent::from_dir(source.clone()).await.unwrap();
+        info!("analyzed dircontent");
         let (new_save, update_list) = UpdateList::for_new_save(&self.db, content);
+        info!("determined save");
         for (object_id, path) in update_list.0 {
             let full_path = source.join(&path);
             let bytes = tokio::fs::read(full_path).await.unwrap();
-            self.add_obj(object_id, path, &bytes).await?;
+            self.add_obj(object_id, path.clone(), &bytes).await?;
+            info!("added object: {:?}", path);
         }
         self.db.push_save(new_save);
         info!("loaded and set save from: {:?}", source);

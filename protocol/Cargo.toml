@@ -11,6 +11,7 @@ tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
 tokio-rustls = "0.23.1"
 tokio-util = { version = "0.6", features = ["codec"] }
 rustls-native-certs = "0.6"
+tracing = "0.1"
 
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }

@@ -32,4 +32,4 @@ wrapper = { path = "../wrapper" }
 
 [features]
 testing = []
-deployed = []
+deployed = ["protocol/deployed"] # encrypt connection with Tls and do not auto fill test credentials
