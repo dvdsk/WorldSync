@@ -68,7 +68,7 @@ impl Input {
 }
 
 #[derive(Default)]
-struct Inputs {
+pub struct Inputs {
     server: Input,
     username: Input,
     password: Input,
@@ -99,8 +99,8 @@ impl Inputs {
 }
 
 
-#[derive(Default)]
 pub struct Page {
+    db: sled::Db,
     inputs: Inputs,
     errorbar: ErrorBar<Error>,
     submit: button::State,
@@ -109,24 +109,18 @@ pub struct Page {
 }
 
 impl Page {
-    pub fn new() -> Self {
+    pub fn new(db: sled::Db) -> Self {
+        let inputs = Inputs::load(&db);
+        let remember = inputs.is_some();
+        let inputs = inputs.unwrap_or(Inputs::default());
+
         Self {
-            #[cfg(not(feature = "deployed"))]
-            inputs: Inputs {
-                server: Input {
-                    value: "127.0.0.1:8080".to_owned(),
-                    ..Input::default()
-                },
-                username: Input {
-                    value: "TestUser_0".to_owned(),
-                    ..Input::default()
-                },
-                password: Input {
-                    value: "testpass0".to_owned(),
-                    ..Input::default()
-                },
-            },
-            ..Self::default()
+            inputs,
+            remember,
+            db,
+            errorbar: ErrorBar::default(),
+            submit: button::State::default(),
+            logging_in: false,
         }
     }
 
@@ -145,7 +139,10 @@ impl Page {
                 inputs.password.value = s;
                 inputs.server.style = style::Input::Ok;
             }
-            Event::RememberToggle(value) => self.remember = value,
+            Event::RememberToggle(value) => {
+                self.remember = value;
+                inputs.store(&self.db);
+            }
             Event::Submit => return self.on_submit(),
             Event::Error(e) => return self.handle_err(e),
             Event::ClearError(e) => self.errorbar.clear(e),

@@ -40,8 +40,9 @@ pub struct State {
 
 impl State {
     fn new() -> Self {
+        let db = tasks::open_settings();
         Self {
-            login: login::Page::new(),
+            login: login::Page::new(db.clone()),
             hosting: None,
             can_host: host::Page::new(),
             can_join: None,

@@ -10,5 +10,7 @@ pub fn main() -> iced::Result {
 
     println!("{}", protocol::current_version());
 
-    gui::State::run(iced::Settings::default())
+    let mut settings = iced::Settings::default();
+    settings.window.size = (500, 400);
+    gui::State::run(settings)
 }

@@ -10,6 +10,9 @@ tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
 protocol = { path = "../protocol" }
 futures = { version = "0.3" }
 thiserror = "1"
+sled = "0.34"
+serde = "1"
+bincode = "1"
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["registry"] }

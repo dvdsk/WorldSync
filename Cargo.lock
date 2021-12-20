@@ -290,14 +290,17 @@ dependencies = [
 name = "client"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "derivative",
  "futures",
  "iced",
  "iced_futures",
  "iced_native",
  "protocol",
+ "serde",
  "server",
  "shared",
+ "sled",
  "sync",
  "thiserror",
  "tokio",

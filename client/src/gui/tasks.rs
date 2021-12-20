@@ -1,9 +1,21 @@
 use iced::Command;
 use tracing::info;
+use std::fs;
 
 use crate::Event;
 
 use super::{RpcConn, State};
+
+pub fn open_settings() -> sled::Db {
+    const DB_PATH: &str = "worldsync";
+    match sled::open(DB_PATH) {
+        Ok(db) => db,
+        Err(_) => {
+            fs::remove_dir(DB_PATH).expect("could not remove corrupt db");
+            sled::open(DB_PATH).expect("could not open new db")
+        }
+    }
+}
 
 #[derive(Default, Clone)]
 pub struct SubStatus {
