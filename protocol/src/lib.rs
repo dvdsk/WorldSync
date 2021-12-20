@@ -1,3 +1,4 @@
+use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
@@ -97,14 +98,38 @@ impl User {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub struct Version {
-    pub protocol: String,
-    pub server: String,
+    semver: String,
+    commit: String,
+    branch: String,
+    build_date: String,
+    features: String,
+    profile: String,
 }
 
-pub fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "  version:")?;
+        writeln!(f, "     - semver: {}", self.semver)?;
+        writeln!(f, "     - commit: {}", self.commit)?;
+        writeln!(f, "     - branch: {}", self.branch)?;
+        writeln!(f, "  build_date: {}", self.build_date)?;
+        writeln!(f, "  features: {}", self.features)?;
+        writeln!(f, "  profile: {}", self.profile)?;
+        Ok(())
+    }
+}
+
+pub fn current_version() -> Version {
+    Version {
+        semver: env!("VERGEN_BUILD_SEMVER").to_string(),
+        commit: env!("VERGEN_GIT_SHA_SHORT").to_string(),
+        branch: env!("VERGEN_GIT_BRANCH").to_string(),
+        build_date: env!("VERGEN_BUILD_DATE").to_string(),
+        features: env!("VERGEN_CARGO_FEATURES").to_string(),
+        profile: env!("VERGEN_CARGO_PROFILE").to_string(),
+    }
 }
 
 use bincode::config::Options;

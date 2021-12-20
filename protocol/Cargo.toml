@@ -2,6 +2,7 @@
 name = "protocol"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 [features]
 deployed = []
@@ -22,3 +23,6 @@ bincode = "1.0"
 shared = { path = "../shared" }
 sync = { path = "../sync" }
 wrapper = { path = "../wrapper" }
+
+[build-dependencies]
+vergen = { version = "6", default-features = false, features = ["build", "git", "cargo"] }

@@ -17,6 +17,7 @@ struct Opt {
 async fn main() {
     let opt = Opt::from_args();
     shared::setup_tracing();
+    println!("{}", protocol::current_version());
 
     if opt.admin_ui {
         admin_ui::run(opt.port).await;

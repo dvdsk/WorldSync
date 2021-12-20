@@ -1,4 +1,4 @@
-use crate::gui::{RpcConn, style};
+use crate::gui::{style, RpcConn};
 use protocol::HostState;
 pub use protocol::ServiceClient;
 use shared::tarpc;
@@ -25,6 +25,18 @@ pub async fn login(
     let client = protocol::connect(&domain, port)
         .await
         .map_err(|_| Error::NoMetaConn)?;
+    let server_version = client
+        .version(context::current())
+        .await
+        .map_err(|_| Error::NoMetaConn)?;
+
+    if server_version != protocol::current_version() {
+        return Err(Error::VersionMismatch {
+            our: protocol::current_version(),
+            server: server_version,
+        });
+    }
+
     let session = client
         .log_in(context::current(), username, password)
         .await
@@ -33,7 +45,7 @@ pub async fn login(
         .host(context::current(), session)
         .await
         .map_err(|_| Error::NoMetaConn)??;
-    Ok((RpcConn{client, session}, host))
+    Ok((RpcConn { client, session }, host))
 }
 
 impl Page {
@@ -68,6 +80,7 @@ impl Page {
                 self.inputs.username.style = style::Input::Err;
                 self.inputs.password.style = style::Input::Err;
             }
+            _ => (),
         }
         self.errorbar.add(e);
         Command::none()

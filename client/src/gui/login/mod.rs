@@ -19,6 +19,11 @@ pub enum Error {
     NoMetaConn,
     #[error("Invalid username or password")]
     IncorrectLogin,
+    #[error("Version incorrect, try updating")]
+    VersionMismatch{
+        our: protocol::Version,
+        server: protocol::Version,
+    }
 }
 
 impl From<protocol::Error> for Error {

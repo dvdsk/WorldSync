@@ -16,10 +16,7 @@ use tracing::{info, instrument, warn};
 #[tarpc::server]
 impl Service for ConnState {
     async fn version(self, _: context::Context) -> protocol::Version {
-        protocol::Version {
-            protocol: protocol::version().to_owned(),
-            server: crate::version().to_owned(),
-        }
+        protocol::current_version()
     }
     async fn log_in(
         mut self,
