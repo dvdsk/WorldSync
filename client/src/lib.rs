@@ -8,5 +8,5 @@ pub use error::Error;
 pub use events::Event;
 pub use world_dl::WorldDl;
 
-pub const SERVER_PATH: &str = "worldsync/server";
+pub const SERVER_PATH: &str = "worldsync/mc_server";
 pub const DB_PATH: &str = "worldsync/db";
