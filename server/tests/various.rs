@@ -9,10 +9,7 @@ async fn version(port: u16) -> protocol::Version {
 
 #[tokio::test]
 async fn version_matches() {
-    let correct = protocol::Version {
-        protocol: protocol::version().to_owned(),
-        server: server::version().to_owned(),
-    };
+    let correct = protocol::current_version();
 
     let port = free_port();
     let server = test_server(port);

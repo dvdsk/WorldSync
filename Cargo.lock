@@ -2901,6 +2901,7 @@ dependencies = [
  "sync",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber 0.3.3",
  "typed-sled",
