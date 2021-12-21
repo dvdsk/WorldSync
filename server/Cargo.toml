@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1", features = ["macros", "net", "sync", "rt-multi-thread"] }
 tokio-util = { version = "0.6", features = ["codec"] }
+ppp = "1"
 futures = { version = "0.3" }
 async-trait = "0.1"
 async-minecraft-ping = { version = "0.4" }

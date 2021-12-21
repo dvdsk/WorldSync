@@ -2,7 +2,7 @@ use crate::db::user::UserDb;
 use crate::host::HostEvent;
 use crate::{Sessions, World};
 use protocol::{Error, Event, HostId, SessionId, UserId};
-use std::net::SocketAddr;
+use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 
@@ -10,7 +10,7 @@ mod calls;
 
 #[derive(Clone)]
 pub struct ConnState {
-    pub peer_addr: SocketAddr,
+    pub peer_addr: IpAddr,
     pub sessions: Sessions,
     pub events: Arc<broadcast::Sender<Event>>,
     pub userdb: UserDb,

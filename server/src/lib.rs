@@ -1,15 +1,18 @@
 use protocol::Event;
 use shared::tarpc::server::BaseChannel;
 use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::net::SocketAddrV4;
+use std::net::Ipv6Addr;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Duration;
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use tokio::time::timeout;
 use tracing::info;
 
 use protocol::{Service, UserId};
@@ -63,7 +66,6 @@ pub fn version() -> &'static str {
 
 #[cfg(not(feature = "deployed"))]
 pub async fn send_test_hb(event_sender: Arc<broadcast::Sender<Event>>) {
-    use std::time::Duration;
     use tokio::time;
 
     let mut number = 0;
@@ -76,6 +78,33 @@ pub async fn send_test_hb(event_sender: Arc<broadcast::Sender<Event>>) {
 
 pub fn events_channel() -> Arc<broadcast::Sender<Event>> {
     Arc::new(broadcast::channel(50).0)
+}
+
+pub async fn extract_peer_addr(conn: &mut TcpStream) -> IpAddr {
+    let mut buf = [0u8; 512]; // 108 bytes enough for v1
+    let fut = conn.peek(&mut buf);
+    if let Err(_) = timeout(Duration::from_millis(250), fut).await {
+        return conn.peer_addr().unwrap().ip();
+    }
+
+    use ppp::model::Addresses;
+    use ppp::error::ParseError;
+    let (left, header) = match ppp::parse_header(&buf) {
+        Ok(res) => res,
+        Err(ParseError::Failure) => return conn.peer_addr().unwrap().ip(),
+        Err(ParseError::Incomplete) => panic!("not enough bytes to parse proxy protocol header"),
+    };
+
+    let mut buf = [0u8; 512];
+    conn.read(&mut buf[..512 - left.len()])
+        .await
+        .expect("could not remove proxy protocol header"); // remove proxy protocol header from conn
+
+    match header.addresses {
+        Addresses::IPv4 { source_address, .. } => IpAddr::V4(Ipv4Addr::from(source_address)),
+        Addresses::IPv6 { source_address, .. } => IpAddr::V6(Ipv6Addr::from(source_address)),
+        _ => panic!("unsupported adress type"),
+    }
 }
 
 pub async fn host(
@@ -93,21 +122,24 @@ pub async fn host(
     use tokio_util::codec::length_delimited::LengthDelimitedCodec;
     let codec_builder = LengthDelimitedCodec::builder();
     loop {
-        let (conn, _addr) = listener.accept().await.unwrap();
+        let (mut conn, _addr) = listener.accept().await.unwrap();
+        let peer_addr = extract_peer_addr(&mut conn).await;
         let framed = codec_builder.new_framed(conn);
 
         use tarpc::serde_transport as transport;
         let transport = transport::new(framed, Bincode::default());
 
-        let peer_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 80));
-        let fut = BaseChannel::with_defaults(transport).execute(ConnState {
-            peer_addr,
-            events: events.clone(),
-            sessions: sessions.clone(),
-            userdb: userdb.clone(),
-            world: world.clone(),
-            host_req: host_req.clone(),
-        }.serve());
+        let fut = BaseChannel::with_defaults(transport).execute(
+            ConnState {
+                peer_addr,
+                events: events.clone(),
+                sessions: sessions.clone(),
+                userdb: userdb.clone(),
+                world: world.clone(),
+                host_req: host_req.clone(),
+            }
+            .serve(),
+        );
         tokio::spawn(fut);
     }
 }
