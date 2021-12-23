@@ -48,9 +48,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.51"
+version = "1.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b26702f315f53b6071259e15dd9d64528213b44d61de1ec926eca7715d62203"
+checksum = "84450d0b4a8bd1ba4144ce8ce718fbc5d071358b1e5384bace6536b3d1f2d5b3"
 
 [[package]]
 name = "approx"
@@ -2124,9 +2124,9 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.13.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05499f3756671c15885fee9034446956fff3f243d6077b91e5767df161f766b3"
+checksum = "19e64526ebdee182341572e50e9ad03965aa510cd94427a4549448f285e957a1"
 dependencies = [
  "hermit-abi",
  "libc",
@@ -2631,9 +2631,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.7"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07bea77bc708afa10e59905c3d4af7c8fd43c9214251673095ff8b14345fcbc5"
+checksum = "7c4e0a76dc12a116108933f6301b95e83634e0c47b0afbed6abbaa0601e99258"
 dependencies = [
  "base64",
  "bytes",
@@ -3177,7 +3177,7 @@ dependencies = [
 [[package]]
 name = "tarpc"
 version = "0.27.2"
-source = "git+https://github.com/google/tarpc#eea38b8bf415be4fb9a06ae28bd0f78182c90f31"
+source = "git+https://github.com/dvdsk/tarpc#c212bceed98613c6aded7f5222b5a8b3d054ed90"
 dependencies = [
  "anyhow",
  "fnv",
@@ -3200,7 +3200,7 @@ dependencies = [
 [[package]]
 name = "tarpc-plugins"
 version = "0.12.0"
-source = "git+https://github.com/google/tarpc#eea38b8bf415be4fb9a06ae28bd0f78182c90f31"
+source = "git+https://github.com/dvdsk/tarpc#c212bceed98613c6aded7f5222b5a8b3d054ed90"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -73,11 +73,9 @@ pub async fn login(
 ) -> Result<(RpcConn, HostState), Error> {
     let client = protocol::connect(&domain, port)
         .await
-        .map_err(|_| Error::NoMetaConn)?;
-    let server_version = client
-        .version(context::current())
-        .await
-        .map_err(|_| Error::NoMetaConn)?;
+        .map_err(|e| e.kind())
+        .map_err(Error::CouldNotConnect)?;
+    let server_version = client.version(context::current()).await?;
 
     if server_version != protocol::current_version() {
         return Err(Error::VersionMismatch {
@@ -88,12 +86,8 @@ pub async fn login(
 
     let session = client
         .log_in(context::current(), username, password)
-        .await
-        .map_err(|_| Error::NoMetaConn)??;
-    let host = client
-        .host(context::current(), session)
-        .await
-        .map_err(|_| Error::NoMetaConn)??;
+        .await??;
+    let host = client.host(context::current(), session).await??;
     Ok((RpcConn { client, session }, host))
 }
 
@@ -122,7 +116,7 @@ impl Page {
 
     pub fn handle_err(&mut self, e: Error) -> Command<Msg> {
         match e {
-            Error::NoMetaConn | Error::NotANumber | Error::InvalidFormat => {
+            Error::NoMetaConn(_) | Error::NotANumber | Error::InvalidFormat => {
                 self.inputs.server.style = style::Input::Err
             }
             Error::IncorrectLogin => {

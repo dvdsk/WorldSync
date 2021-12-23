@@ -81,7 +81,7 @@ async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
             Err(RpcError::DeadlineExceeded) => {
                 continue;
             }
-            Err(_) => return Err(Error::NoMetaConn),
+            Err(e) => return Err(Error::NoMetaConn(e)),
         }
     }
 }

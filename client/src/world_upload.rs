@@ -47,20 +47,14 @@ struct State {
 
 #[derive(Clone, Debug, thiserror::Error, Eq, PartialEq, Hash)]
 pub enum Error {
-    #[error("Lost connection to meta conn")]
-    NoMetaConn,
+    #[error("Lost connection to worldsync server: {0:?}")]
+    NoMetaConn(#[from] RpcError),
     #[error("Could not access local file system, is folder read only or hard drive full?")]
     Fs,
     #[error("{0}")]
     Protocol(#[from] protocol::Error),
     #[error("Could not sync save")]
     SyncError,
-}
-
-impl From<RpcError> for Error {
-    fn from(_: RpcError) -> Self {
-        Error::NoMetaConn
-    }
 }
 
 impl From<sync::Error> for Error {

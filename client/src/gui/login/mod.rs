@@ -4,6 +4,7 @@ pub use crate::Event as Msg;
 use iced::widget::Column;
 use iced::{button, text_input, Button, Checkbox, Command, Length, Row, Space, TextInput};
 use iced::{Align, Element, HorizontalAlignment, Text};
+use shared::tarpc::client::RpcError;
 
 use super::parts::ClearError;
 
@@ -15,8 +16,10 @@ pub enum Error {
     InvalidFormat,
     #[error("Port is not a number, please check the address")]
     NotANumber,
-    #[error("Could not connect to WorldSync server")]
-    NoMetaConn,
+    #[error("Lost connection to worldsync server: {0:?}")]
+    NoMetaConn(#[from] RpcError),
+    #[error("Could not connect to worldsync server: {0:?}")]
+    CouldNotConnect(std::io::ErrorKind),
     #[error("Invalid username or password")]
     IncorrectLogin,
     #[error("Version incorrect, try updating")]

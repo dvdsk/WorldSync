@@ -11,8 +11,7 @@ use iced::Command;
 async fn request_to_host(rpc: RpcConn, host_id: HostId) -> Result<(), Error> {
     rpc.client
         .request_to_host(context::current(), rpc.session, host_id)
-        .await
-        .map_err(|_| Error::NoMetaConn)?
+        .await?
         .map_err(|e| e.into())
 }
 
