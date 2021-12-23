@@ -2412,11 +2412,11 @@ checksum = "58893f751c9b0412871a09abd62ecd2a00298c6c83befa223ef98c52aef40cbe"
 
 [[package]]
 name = "ppp"
-version = "1.2.2"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc7c12f80d78a4f11883bef851dc51c5b66e53e36a483f024f7fe19416414473"
+checksum = "709b51daa3760197a46ec9b9298a4a92b94b2f648c9915e3da6855c5b369bc26"
 dependencies = [
- "nom",
+ "thiserror",
 ]
 
 [[package]]

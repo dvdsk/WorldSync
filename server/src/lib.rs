@@ -1,7 +1,6 @@
 use protocol::Event;
 use shared::tarpc::server::BaseChannel;
 use std::collections::HashMap;
-use std::net::Ipv6Addr;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -81,30 +80,49 @@ pub fn events_channel() -> Arc<broadcast::Sender<Event>> {
 }
 
 pub async fn extract_peer_addr(conn: &mut TcpStream) -> IpAddr {
-    let mut buf = [0u8; 512]; // 108 bytes enough for v1
+    let mut buf = [0u8; 256]; // 108 bytes enough for v1
     let fut = conn.peek(&mut buf);
-    if let Err(_) = timeout(Duration::from_millis(250), fut).await {
-        return conn.peer_addr().unwrap().ip();
+    if let Err(_) = timeout(Duration::from_millis(10), fut).await {
+        dbg!("timeout");
+        // return conn.peer_addr().unwrap().ip();
     }
+    dbg!("no_timeout");
 
-    use ppp::model::Addresses;
-    use ppp::error::ParseError;
-    let (left, header) = match ppp::parse_header(&buf) {
-        Ok(res) => res,
-        Err(ParseError::Failure) => return conn.peer_addr().unwrap().ip(),
-        Err(ParseError::Incomplete) => panic!("not enough bytes to parse proxy protocol header"),
+    use ppp::{HeaderResult, PartialResult};
+    let (len, addr) = match HeaderResult::parse(&buf) {
+        HeaderResult::V1(Ok(header)) => {
+            use ppp::v1::Addresses::*;
+            let len = header.header.len();
+            match header.addresses {
+                Tcp4(addr) => (len, IpAddr::V4(addr.source_address)),
+                Tcp6(addr) => (len, IpAddr::V6(addr.source_address)),
+                _ => unreachable!(),
+            }
+        }
+        HeaderResult::V2(Ok(header)) => {
+            use ppp::v2::Addresses::*;
+            let len = header.len();
+            match header.addresses {
+                IPv4(addr) => (len, IpAddr::V4(addr.source_address)),
+                IPv6(addr) => (len, IpAddr::V6(addr.source_address)),
+                _ => unreachable!(),
+            }
+        }
+        HeaderResult::V1(Err(e)) if e.is_incomplete() => {
+            panic!("header incomplete need more bytes")
+        }
+        HeaderResult::V2(Err(e)) if e.is_incomplete() => {
+            panic!("header incomplete need more bytes")
+        }
+        _ => return conn.peer_addr().unwrap().ip(),
     };
 
+    dbg!(len, &addr);
     let mut buf = [0u8; 512];
-    conn.read(&mut buf[..512 - left.len()])
+    conn.read(&mut buf[..len])
         .await
         .expect("could not remove proxy protocol header"); // remove proxy protocol header from conn
-
-    match header.addresses {
-        Addresses::IPv4 { source_address, .. } => IpAddr::V4(Ipv4Addr::from(source_address)),
-        Addresses::IPv6 { source_address, .. } => IpAddr::V6(Ipv6Addr::from(source_address)),
-        _ => panic!("unsupported adress type"),
-    }
+    addr
 }
 
 pub async fn host(
@@ -118,28 +136,33 @@ pub async fn host(
     let server_addr = (IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     info!("starting listener on port {}", port);
 
-    let listener = TcpListener::bind(server_addr).await.unwrap();
+    let base_state = ConnState {
+        peer_addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
+        events,
+        sessions,
+        userdb,
+        world,
+        host_req,
+    };
+
     use tokio_util::codec::length_delimited::LengthDelimitedCodec;
     let codec_builder = LengthDelimitedCodec::builder();
+    let listener = TcpListener::bind(server_addr).await.unwrap();
     loop {
-        let (mut conn, _addr) = listener.accept().await.unwrap();
-        let peer_addr = extract_peer_addr(&mut conn).await;
-        let framed = codec_builder.new_framed(conn);
+        dbg!();
+        let (mut conn, _) = listener.accept().await.unwrap();
+        let mut conn_state = base_state.clone();
 
-        use tarpc::serde_transport as transport;
-        let transport = transport::new(framed, Bincode::default());
+        tokio::spawn(async move {
+            conn_state.peer_addr = extract_peer_addr(&mut conn).await;
+            let framed = codec_builder.new_framed(conn);
 
-        let fut = BaseChannel::with_defaults(transport).execute(
-            ConnState {
-                peer_addr,
-                events: events.clone(),
-                sessions: sessions.clone(),
-                userdb: userdb.clone(),
-                world: world.clone(),
-                host_req: host_req.clone(),
-            }
-            .serve(),
-        );
-        tokio::spawn(fut);
+            use tarpc::serde_transport as transport;
+            let transport = transport::new(framed, Bincode::default());
+
+            BaseChannel::with_defaults(transport)
+                .execute(conn_state.serve())
+                .await;
+        });
     }
 }

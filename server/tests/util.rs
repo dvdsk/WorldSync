@@ -8,7 +8,7 @@ pub fn free_port() -> u16 {
     FREE_PORT.fetch_add(1, Ordering::Relaxed)
 }
 
-pub async fn test_server(port: u16) {
+pub async fn spawn_test_server(port: u16) {
     use server::db::user::UserDb;
 
     let db = server::db::test_db();
@@ -32,7 +32,9 @@ pub async fn test_server(port: u16) {
     let host = server::host(sessions, userdb, world, port, events, host_req);
     tokio::spawn(async move {
         tokio::join!(monitor, host);
-    }).await.unwrap();
+    });
+    // extra time to ensure server reachable by the time we exit this functino
+    tokio::time::sleep(Duration::from_millis(50)).await;
 }
 
 pub async fn test_conn(port: u16) -> protocol::ServiceClient {

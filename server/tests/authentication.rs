@@ -4,7 +4,7 @@ use shared::tarpc::context;
 use protocol::Uuid;
 
 mod util;
-use util::{free_port, test_conn, test_server};
+use util::{free_port, spawn_test_server, test_conn};
 
 async fn try_log_in(
     user: impl Into<String>,
@@ -21,37 +21,27 @@ async fn try_log_in(
 #[tokio::test]
 async fn wrong_user_and_pass() {
     let port = free_port();
-    let server = test_server(port);
-    let result = tokio::select! {
-        _ = server => panic!("server crashed during client test"),
-        r = try_log_in("wrong user", "wrong pass", port) => r,
-    };
-
+    spawn_test_server(port).await;
+    let result = try_log_in("wrong user", "wrong pass", port).await;
     assert!(result.is_err());
 }
 
 #[tokio::test]
 async fn correct_user_and_pass() {
     let port = free_port();
-    let server = test_server(port);
+    spawn_test_server(port).await;
     let username = User::test_username(0);
     let password = User::test_password(0);
-    let result = tokio::select! {
-        _ = server => panic!("server crashed during client test"),
-        r = try_log_in(username, password, port) => r,
-    };
+    let result = try_log_in(username, password, port).await;
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn correct_user_wrong_pass() {
     let port = free_port();
-    let server = test_server(port);
+    spawn_test_server(port).await;
     let username = User::test_username(0);
-    let result = tokio::select! {
-        _ = server => panic!("server crashed during client test"),
-        r = try_log_in(username, "wrong pass", port) => r,
-    };
+    let result = try_log_in(username, "wrong pass", port).await;
     assert!(result.is_err());
 }
 
@@ -94,11 +84,8 @@ async fn test_change_password(port: u16) {
 #[tokio::test]
 async fn change_password() {
     let port = free_port();
-    let server = test_server(port);
-    tokio::select! {
-        _ = server => panic!("server crashed during client test"),
-        r = test_change_password(port) => r,
-    };
+    spawn_test_server(port).await;
+    test_change_password(port).await;
 }
 
 async fn test_session_expired_after_pass_change(port: u16) {
@@ -115,9 +102,6 @@ async fn test_session_expired_after_pass_change(port: u16) {
 #[tokio::test]
 async fn session_expired_after_pass_change() {
     let port = free_port();
-    let server = test_server(port);
-    tokio::select! {
-        _ = server => panic!("server crashed during client test"),
-        r = test_session_expired_after_pass_change(port) => r,
-    };
+    spawn_test_server(port).await;
+    test_session_expired_after_pass_change(port).await;
 }
