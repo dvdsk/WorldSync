@@ -2,10 +2,12 @@ use crate::gui::RpcConn;
 pub use protocol::{HostId, ServiceClient};
 use shared::tarpc;
 pub use tarpc::context;
+use tracing::instrument;
 
 use super::{Error, Event, Msg, Page};
 use iced::Command;
 
+#[instrument(err)]
 async fn request_to_host(rpc: RpcConn, host_id: HostId) -> Result<(), Error> {
     rpc.client
         .request_to_host(context::current(), rpc.session, host_id)

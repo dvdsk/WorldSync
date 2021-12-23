@@ -10,7 +10,7 @@ use tracing::info;
 use wrapper::Instance;
 
 use crate::gui::RpcConn;
-use crate::{Event, SERVER_PATH};
+use crate::{Event, server_path};
 
 // pub mod server;
 pub fn sub() -> iced::Subscription<Event> {
@@ -54,7 +54,7 @@ where
 
 async fn start(mut state: State) -> (Event, State) {
     info!("starting minecraft server");
-    match Instance::start(Path::new(SERVER_PATH), 2).await {
+    match Instance::start(Path::new(server_path()), 2).await {
         Err(e) => {
             use crate::gui::host::Event as hEvent;
             let event = Event::HostPage(hEvent::Error(e.into()));

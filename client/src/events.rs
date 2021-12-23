@@ -4,6 +4,7 @@ use futures::stream::{self, BoxStream};
 use protocol::HostState;
 use shared::tarpc::client::RpcError;
 use shared::tarpc::context::Context;
+use tracing::instrument;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -68,6 +69,7 @@ where
     }
 }
 
+#[instrument(err)]
 async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
     let mut context = Context::current();
     loop {

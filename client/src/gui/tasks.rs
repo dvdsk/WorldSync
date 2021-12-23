@@ -1,5 +1,5 @@
 use iced::Command;
-use tracing::info;
+use tracing::{info, warn};
 use std::fs;
 
 use crate::Event;
@@ -7,13 +7,15 @@ use crate::Event;
 use super::{RpcConn, State};
 
 pub fn open_settings() -> sled::Db {
-    use crate::DB_PATH;
-    fs::create_dir_all(DB_PATH).unwrap();
-    match sled::open(DB_PATH) {
+    use crate::db_path;
+    let dir = db_path().parent().unwrap();
+    fs::create_dir_all(dir).unwrap();
+    match sled::open(db_path()) {
         Ok(db) => db,
-        Err(_) => {
-            fs::remove_dir(DB_PATH).expect("could not remove corrupt db");
-            sled::open(DB_PATH).expect("could not open new db")
+        Err(e) => {
+            warn!("error opening db: {:?}", e);
+            fs::remove_dir(db_path()).expect("could not remove corrupt db");
+            sled::open(db_path()).expect("could not open new db")
         }
     }
 }

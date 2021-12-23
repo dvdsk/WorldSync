@@ -10,6 +10,7 @@ use super::{Error, Event, Msg, Page};
 use futures::future;
 use iced::Command;
 
+#[instrument(err)]
 fn parse_server_str(server_str: &str) -> Result<(String, u16), Error> {
     let (domain, port) = server_str.split_once(':').ok_or(Error::InvalidFormat)?;
     let port = port.parse().map_err(|_| Error::NotANumber)?;

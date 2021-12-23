@@ -1,11 +1,12 @@
 use iced::Command;
-use tracing::info;
+use tracing::{info, instrument};
 use wrapper::Line;
 
 use crate::gui::{hosting, RpcConn};
 
 use super::{Msg, Page};
 
+#[instrument(err)]
 pub async fn save(mut handle: wrapper::Handle) -> Result<(), wrapper::HandleError> {
     handle.save().await
 }
