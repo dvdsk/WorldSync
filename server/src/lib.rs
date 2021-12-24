@@ -12,7 +12,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use tracing::info;
+use tracing::{info, warn};
 
 use protocol::{Service, UserId};
 use shared::tarpc;
@@ -83,10 +83,8 @@ pub async fn extract_peer_addr(conn: &mut TcpStream) -> IpAddr {
     let mut buf = [0u8; 256]; // 108 bytes enough for v1
     let fut = conn.peek(&mut buf);
     if let Err(_) = timeout(Duration::from_millis(10), fut).await {
-        dbg!("timeout");
-        // return conn.peer_addr().unwrap().ip();
+        warn!("timeout peeking proxy protocol header");
     }
-    dbg!("no_timeout");
 
     use ppp::{HeaderResult, PartialResult};
     let (len, addr) = match HeaderResult::parse(&buf) {
@@ -117,7 +115,6 @@ pub async fn extract_peer_addr(conn: &mut TcpStream) -> IpAddr {
         _ => return conn.peer_addr().unwrap().ip(),
     };
 
-    dbg!(len, &addr);
     let mut buf = [0u8; 512];
     conn.read(&mut buf[..len])
         .await
@@ -146,16 +143,15 @@ pub async fn host(
     };
 
     use tokio_util::codec::length_delimited::LengthDelimitedCodec;
-    let codec_builder = LengthDelimitedCodec::builder();
+    let mut codec_builder = LengthDelimitedCodec::builder();
     let listener = TcpListener::bind(server_addr).await.unwrap();
     loop {
-        dbg!();
         let (mut conn, _) = listener.accept().await.unwrap();
         let mut conn_state = base_state.clone();
 
         tokio::spawn(async move {
             conn_state.peer_addr = extract_peer_addr(&mut conn).await;
-            let framed = codec_builder.new_framed(conn);
+            let framed = codec_builder.max_frame_length(100*1024).new_framed(conn);
 
             use tarpc::serde_transport as transport;
             let transport = transport::new(framed, Bincode::default());
