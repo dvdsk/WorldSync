@@ -82,7 +82,7 @@ impl Page {
                     return self.save_world();
                 }
             }
-            Event::Mc(event) => match event {
+            Event::Mc(event) => match dbg!(event) {
                 Ok(line) => return self.handle_server_line(line, self.rpc.clone()),
                 Err(e) => self.errorbar.add(e.into()),
             },

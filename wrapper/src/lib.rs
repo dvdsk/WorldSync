@@ -1,5 +1,4 @@
 use derivative::Derivative;
-use tokio::sync::Mutex;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -7,13 +6,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tracing::{debug, instrument};
 
-pub mod parser;
 mod config;
-pub use parser::{Line, Message};
+pub mod parser;
 pub use config::Config;
+pub use parser::{Line, Message};
 
 #[derive(Clone, Debug, thiserror::Error, Hash, PartialEq, Eq)]
 pub enum Error {
@@ -32,6 +32,8 @@ pub enum Error {
     NoJar(PathBuf),
     #[error("Java version outdated")]
     OutdatedJava { required: String },
+    #[error("Eula not accepted")]
+    EulaUnaccepted(&'static str),
 }
 
 #[derive(Derivative)]
@@ -63,11 +65,22 @@ impl Instance {
         Self::start_instance(server_path.as_ref(), mem_size).await
     }
 
+    pub async fn assert_eula_accepted(server_path: &Path) -> Result<(), Error> {
+        let path = server_path.join("eula.txt");
+        match tokio::fs::read_to_string(path).await {
+            Ok(s) if s.contains("eula=true") => Ok(()),
+            Ok(_) => Err(Error::EulaUnaccepted("present but unaccepted")),
+            Err(_) => Err(Error::EulaUnaccepted("file eula.txt missing")),
+        }
+    }
+
     #[instrument(err)]
     async fn start_instance(server_path: &Path, mem_size: u8) -> Result<(Self, Handle), Error> {
         let working_dir = tokio::fs::canonicalize(server_path)
             .await
             .map_err(|_| Error::IncorrectServerPath)?;
+        Self::assert_eula_accepted(server_path).await?;
+
         let mut child = Command::new("java")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -170,7 +183,9 @@ impl Handle {
         Self(Arc::new(Mutex::new(stdin)))
     }
     pub async fn save(&mut self) -> Result<(), HandleError> {
-        self.0.lock().await
+        self.0
+            .lock()
+            .await
             .write_all(b"/save-all\n")
             .await
             .map_err(|e| e.to_string())

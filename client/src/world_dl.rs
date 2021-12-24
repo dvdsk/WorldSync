@@ -100,13 +100,13 @@ impl State {
             info!("created directory for server: {:?}", server_path());
             fs::create_dir(server_path()).await.unwrap();
         }
-        let dir_content = dbg!(DirContent::from_dir(server_path().into()).await?);
+        let dir_content = DirContent::from_dir(server_path().into()).await?;
         let dir_update = self
             .conn
             .client
             .dir_update(context::current(), self.conn.session, dir_content)
             .await??;
-        Ok(dbg!(dir_update))
+        Ok(dir_update)
     }
 
     async fn await_dir_update(mut self) -> (Event, Self) {

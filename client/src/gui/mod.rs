@@ -121,7 +121,11 @@ impl Application for State {
                     .update(host::Event::WorldUpdated, self.unwrap_rpc());
             }
             McHandle(handle) => {
-                self.hosting = Some(hosting::Page::from(handle, self.can_host.host_id.unwrap(), self.unwrap_rpc().clone()))
+                self.hosting = Some(hosting::Page::from(
+                    handle,
+                    self.can_host.host_id.unwrap(),
+                    self.unwrap_rpc().clone(),
+                ))
             }
             Mc(event) => match self.page {
                 Page::Host => {

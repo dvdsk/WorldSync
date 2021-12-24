@@ -19,6 +19,7 @@ pub fn sub() -> iced::Subscription<Event> {
 
 pub struct McServer {}
 
+#[derive(Debug)]
 enum Phase {
     Start,
     Running,
@@ -77,7 +78,7 @@ async fn forward_events(mut state: State) -> (Event, State) {
 }
 
 async fn state_machine(state: State) -> Option<(Event, State)> {
-    match state.phase {
+    match dbg!(&state.phase) {
         Phase::Start => Some(start(state).await),
         Phase::Running => Some(forward_events(state).await),
         Phase::Error => None,
