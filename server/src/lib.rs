@@ -94,7 +94,10 @@ pub async fn extract_peer_addr(conn: &mut TcpStream) -> Result<IpAddr, Error> {
 
     use ppp::{HeaderResult, PartialResult};
     let (len, addr) = match HeaderResult::parse(&buf) {
-        HeaderResult::V1(_) => panic!("V1 proxy protocol header is not supported"),
+        HeaderResult::V1(_) => {
+            debug!("proxy protocol header is not supported, assuming none is present");
+            return Ok(conn.peer_addr().unwrap().ip());
+        }
         HeaderResult::V2(Ok(header)) => {
             use ppp::v2::Addresses::*;
             let len = header.len();
@@ -153,7 +156,7 @@ pub async fn host(
                 }
             };
 
-            let framed = codec_builder.max_frame_length(100 * 1024).new_framed(conn);
+            let framed = codec_builder.max_frame_length(100 * 1024 * 1024).new_framed(conn);
 
             use tarpc::serde_transport as transport;
             let transport = transport::new(framed, Bincode::default());

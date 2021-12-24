@@ -10,7 +10,7 @@ pub use time;
 pub use uuid::Uuid;
 
 mod connect;
-pub use connect::connect;
+pub use connect::{connect, connect_local};
 
 #[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum Error {

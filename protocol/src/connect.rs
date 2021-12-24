@@ -46,3 +46,15 @@ pub async fn connect(domain: &str, port: u16) -> Result<ServiceClient, std::io::
     let client = ServiceClient::new(Config::default(), transport).spawn();
     Ok(client)
 }
+
+#[instrument(err)]
+pub async fn connect_local(port: u16) -> Result<ServiceClient, std::io::Error> {
+    let conn = TcpStream::connect(format!("127.0.0.1:{}", port)).await?;
+    use tokio_util::codec::length_delimited::LengthDelimitedCodec;
+    let mut codec_builder = LengthDelimitedCodec::builder();
+
+    let framed = codec_builder.max_frame_length(usize::MAX).new_framed(conn);
+    let transport = tarpc::serde_transport::new(framed, Bincode::default());
+    let client = ServiceClient::new(Config::default(), transport).spawn();
+    Ok(client)
+}
