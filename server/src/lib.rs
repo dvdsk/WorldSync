@@ -12,7 +12,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use protocol::{Service, UserId};
 use shared::tarpc;
@@ -79,7 +79,13 @@ pub fn events_channel() -> Arc<broadcast::Sender<Event>> {
     Arc::new(broadcast::channel(50).0)
 }
 
-pub async fn extract_peer_addr(conn: &mut TcpStream) -> IpAddr {
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("invalid header: {0:?}")]
+    InvalidAddressType(ppp::v2::Addresses),
+}
+
+pub async fn extract_peer_addr(conn: &mut TcpStream) -> Result<IpAddr, Error> {
     let mut buf = [0u8; 256]; // 108 bytes enough for v1
     let fut = conn.peek(&mut buf);
     if let Err(_) = timeout(Duration::from_millis(10), fut).await {
@@ -88,38 +94,27 @@ pub async fn extract_peer_addr(conn: &mut TcpStream) -> IpAddr {
 
     use ppp::{HeaderResult, PartialResult};
     let (len, addr) = match HeaderResult::parse(&buf) {
-        HeaderResult::V1(Ok(header)) => {
-            use ppp::v1::Addresses::*;
-            let len = header.header.len();
-            match header.addresses {
-                Tcp4(addr) => (len, IpAddr::V4(addr.source_address)),
-                Tcp6(addr) => (len, IpAddr::V6(addr.source_address)),
-                _ => unreachable!(),
-            }
-        }
+        HeaderResult::V1(_) => panic!("V1 proxy protocol header is not supported"),
         HeaderResult::V2(Ok(header)) => {
             use ppp::v2::Addresses::*;
             let len = header.len();
             match header.addresses {
                 IPv4(addr) => (len, IpAddr::V4(addr.source_address)),
                 IPv6(addr) => (len, IpAddr::V6(addr.source_address)),
-                _ => unreachable!(),
+                _addr => return Err(Error::InvalidAddressType(_addr)),
             }
-        }
-        HeaderResult::V1(Err(e)) if e.is_incomplete() => {
-            panic!("header incomplete need more bytes")
         }
         HeaderResult::V2(Err(e)) if e.is_incomplete() => {
             panic!("header incomplete need more bytes")
         }
-        _ => return conn.peer_addr().unwrap().ip(),
+        _ => return Ok(conn.peer_addr().unwrap().ip()),
     };
 
     let mut buf = [0u8; 512];
     conn.read(&mut buf[..len])
         .await
         .expect("could not remove proxy protocol header"); // remove proxy protocol header from conn
-    addr
+    Ok(addr)
 }
 
 pub async fn host(
@@ -150,8 +145,15 @@ pub async fn host(
         let mut conn_state = base_state.clone();
 
         tokio::spawn(async move {
-            conn_state.peer_addr = extract_peer_addr(&mut conn).await;
-            let framed = codec_builder.max_frame_length(100*1024).new_framed(conn);
+            conn_state.peer_addr = match extract_peer_addr(&mut conn).await {
+                Ok(addr) => addr,
+                Err(e) => {
+                    debug!("could not extract peer address: {}, dropping connection", e);
+                    return;
+                }
+            };
+
+            let framed = codec_builder.max_frame_length(100 * 1024).new_framed(conn);
 
             use tarpc::serde_transport as transport;
             let transport = transport::new(framed, Bincode::default());
