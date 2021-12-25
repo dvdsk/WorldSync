@@ -78,7 +78,7 @@ async fn forward_events(mut state: State) -> (Event, State) {
 }
 
 async fn state_machine(state: State) -> Option<(Event, State)> {
-    match dbg!(&state.phase) {
+    match &state.phase {
         Phase::Start => Some(start(state).await),
         Phase::Running => Some(forward_events(state).await),
         Phase::Error => None,

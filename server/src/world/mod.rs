@@ -1,7 +1,7 @@
+use protocol::{HostId, HostState};
 use std::path::PathBuf;
-use protocol::{HostState, HostId};
-use sync::{DirContent, DirUpdate, UpdateList, Save, ObjectId, ObjectStore};
-use tracing::{info, instrument, debug};
+use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save, UpdateList};
+use tracing::{debug, info, instrument};
 use typed_sled::sled;
 
 use crate::db::world::WorldDb;
@@ -13,10 +13,7 @@ pub struct World {
 }
 
 impl World {
-    pub async fn from(
-        db: sled::Db,
-        host: crate::host::Host,
-    ) -> Self {
+    pub async fn from(db: sled::Db, host: crate::host::Host) -> Self {
         Self {
             db: WorldDb::from(db).await,
             host,
@@ -52,9 +49,9 @@ impl World {
         Ok(())
     }
 
-    pub async fn is_host(&self, id: HostId) -> Result<(),()> {
+    pub async fn is_host(&self, id: HostId) -> Result<(), ()> {
         match &*self.host.state.read().await {
-            HostState::Up(host) | HostState::Loading(host) => {
+            HostState::Up(host) | HostState::Loading(host) | HostState::Unreachable(host) => {
                 if host.id != id {
                     Err(())
                 } else {
@@ -93,7 +90,12 @@ impl World {
         Ok(())
     }
 
-    pub async fn add_obj(&self, id: ObjectId, path: PathBuf, bytes: &[u8]) -> Result<(), protocol::Error> {
+    pub async fn add_obj(
+        &self,
+        id: ObjectId,
+        path: PathBuf,
+        bytes: &[u8],
+    ) -> Result<(), protocol::Error> {
         Ok(self.db.add_obj(id, path, bytes).await?)
     }
 }

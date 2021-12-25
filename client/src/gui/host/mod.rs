@@ -73,7 +73,7 @@ impl Page {
                 self.loading_server.start(100.0, 0.0);
             }
             Event::Loading(p) => self.loading_server.set_progress(p as f32),
-            Event::Mc(event) => match dbg!(event) {
+            Event::Mc(event) => match event {
                 Ok(line) => return mc::send_line(line, rpc, self.host_id.unwrap()),
                 Err(e) => self.errorbar.add(e.into()),
             }

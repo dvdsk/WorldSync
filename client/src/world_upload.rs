@@ -12,7 +12,7 @@ use tokio::fs;
 use tracing::{error, instrument};
 
 use crate::gui::{hosting, RpcConn};
-use crate::{Event, server_path};
+use crate::{server_path, Event};
 
 pub fn sub(conn: RpcConn, count: usize, host_id: HostId) -> iced::Subscription<Event> {
     iced::Subscription::from_recipe(WorldUpload {
@@ -108,8 +108,9 @@ where
 impl State {
     #[instrument(err)]
     async fn do_build_updatelist(&mut self) -> Result<(Save, UpdateList), Error> {
-        let dir =
-            DirContent::from_dir(server_path().into()).await.map_err(|_| Error::SyncError)?;
+        let dir = DirContent::from_dir(server_path().into())
+            .await
+            .map_err(|_| Error::SyncError)?;
         Ok(self
             .conn
             .client
@@ -121,7 +122,7 @@ impl State {
     async fn build_updatelist(mut self) -> (Event, Self) {
         let event = match self.do_build_updatelist().await {
             Ok((save, list)) => {
-                let num_obj = dbg!(list.0.len());
+                let num_obj = list.0.len();
                 self.object_list = Some(list);
                 self.save = Some(save);
                 self.phase = Phase::Uploading;

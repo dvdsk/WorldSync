@@ -92,6 +92,7 @@ impl Service for ConnState {
         Ok(self.world.host.state.read().await.clone())
     }
 
+    #[instrument(err, skip(self))]
     async fn request_to_host(
         self,
         _: context::Context,
@@ -136,6 +137,7 @@ impl Service for ConnState {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         Ok(self.world.get_update(dir))
     }
+    #[instrument(err, skip(self, dir))]
     async fn new_save(
         self,
         _: context::Context,
@@ -148,6 +150,7 @@ impl Service for ConnState {
         Ok(self.world.new_save(dir))
     }
 
+    #[instrument(err, skip(self, save))]
     async fn register_save(
         self,
         _: context::Context,
@@ -187,16 +190,8 @@ impl Service for ConnState {
     }
 
     #[instrument(err, skip(self))]
-    async fn pub_mc_line(self, _: context::Context, id: HostId, line: Line) -> Result<(), Error> {
-        match &*self.world.host.state.read().await {
-            HostState::Up(host) | HostState::Loading(host) => {
-                if host.id != id {
-                    return Err(Error::NotHost);
-                }
-            }
-            _ => return Err(Error::NotHost),
-        }
-
+    async fn pub_mc_line(self, _: context::Context, host_id: HostId, line: Line) -> Result<(), Error> {
+        let _ = self.is_host(host_id).await?;
         match HostEvent::try_from(line) {
             Ok(event) => self.host_req.send(event).await.unwrap(),
             Err(_) => (), // unprocessed line
