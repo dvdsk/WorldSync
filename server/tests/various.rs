@@ -1,6 +1,5 @@
 mod util;
 use std::net::SocketAddr;
-use std::time::Duration;
 
 use protocol::ServiceClient;
 use shared::tarpc::client::Config;

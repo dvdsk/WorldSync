@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use crate::db::world::WorldDb;
@@ -37,13 +36,13 @@ impl Service for ConnState {
             }
             Err(DbError::IncorrectPass) => {
                 warn!(
-                    "Incorrect password for user: '{}' from {}",
+                    "Incorrect password for user: '{}' from {:?}",
                     username, self.peer_addr
                 );
                 Err(Error::IncorrectLogin)
             }
             Err(DbError::IncorrectName) => {
-                warn!("Incorrect username ({}) from {}", username, self.peer_addr);
+                warn!("Incorrect username ({}) from {:?}", username, self.peer_addr);
                 Err(Error::IncorrectLogin)
             }
             Err(e) => Err(e.into()),
@@ -101,10 +100,10 @@ impl Service for ConnState {
     ) -> Result<(), Error> {
         let user_id = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let name = self.userdb.get_name(user_id)?.unwrap();
-        let addr = SocketAddr::from((self.peer_addr, 25565));
         let details = HostDetails {
             name,
-            addr,
+            addr: self.peer_addr(),
+            port: 25565,
             id: host_id,
         };
         self.host_req
@@ -205,7 +204,7 @@ impl Service for ConnState {
         user: User,
         password: String,
     ) -> Result<(), Error> {
-        if !self.peer_addr.is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         self.userdb.add_user(user.clone(), password).await?;
@@ -214,7 +213,7 @@ impl Service for ConnState {
     }
 
     async fn list_users(self, _: context::Context) -> Result<Vec<(UserId, User)>, Error> {
-        if !self.peer_addr.is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         Ok(self.userdb.get_userlist()?)
@@ -227,7 +226,7 @@ impl Service for ConnState {
         old: User,
         new: User,
     ) -> Result<(), Error> {
-        if !self.peer_addr.is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         self.userdb.update_user(id, old.clone(), new).await?;
@@ -241,7 +240,7 @@ impl Service for ConnState {
         user_id: UserId,
         new_password: String,
     ) -> Result<(), Error> {
-        if !self.peer_addr.is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
 
@@ -254,7 +253,7 @@ impl Service for ConnState {
     }
 
     async fn remove_account(mut self, _: context::Context, id: UserId) -> Result<(), Error> {
-        if !self.peer_addr.is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         let name = self.userdb.remove_user(id).await?;
@@ -263,7 +262,7 @@ impl Service for ConnState {
     }
 
     async fn dump_save(self, _: context::Context, dir: PathBuf) -> Result<(), Error> {
-        if !self.peer_addr.is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
 
@@ -277,7 +276,7 @@ impl Service for ConnState {
     }
 
     async fn set_save(self, _: context::Context, dir: PathBuf) -> Result<(), Error> {
-        if !self.peer_addr.is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
 

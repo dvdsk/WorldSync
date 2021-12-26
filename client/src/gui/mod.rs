@@ -113,7 +113,7 @@ impl Application for State {
                     }
                 }
             }
-            ClipHost => clipboard.write(self.can_join.as_ref().unwrap().host.addr.ip().to_string()),
+            ClipHost => clipboard.write(self.can_join.as_ref().unwrap().host.addr.to_string()),
             WorldUpdated => {
                 self.mc_server.start();
                 return self

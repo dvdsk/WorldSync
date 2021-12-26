@@ -1,4 +1,4 @@
-use protocol::Event;
+use protocol::{Event, Addr};
 use shared::tarpc::server::BaseChannel;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
@@ -23,6 +23,7 @@ use uuid::Uuid;
 pub mod admin_ui;
 pub mod db;
 pub mod host;
+pub mod util;
 mod world;
 use db::user::UserDb;
 pub use world::World;
@@ -120,11 +121,30 @@ pub async fn extract_peer_addr(conn: &mut TcpStream) -> Result<IpAddr, Error> {
     Ok(addr)
 }
 
+/// Temp impl until ip.is_global() is stabalized, this is a bad
+/// solution it will probably break on a lot of networks but it works
+/// on mine.
+fn is_private(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(addr) => {
+            let oct = addr.octets();
+            match (oct[0], oct[1]) {
+                (10, _) => true,
+                (192, 168) => true,
+                (172, _n) => unimplemented!(),
+                _ => false,
+            }
+        }
+        _ => unimplemented!(),
+    }
+}
+
 pub async fn host(
     sessions: Sessions,
     userdb: UserDb,
     world: World,
     port: u16,
+    domain: String,
     events: Arc<broadcast::Sender<Event>>,
     host_req: mpsc::Sender<host::HostEvent>,
 ) {
@@ -132,7 +152,7 @@ pub async fn host(
     info!("starting listener on port {}", port);
 
     let base_state = ConnState {
-        peer_addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
+        peer_addr: None,
         events,
         sessions,
         userdb,
@@ -146,10 +166,13 @@ pub async fn host(
     loop {
         let (mut conn, _) = listener.accept().await.unwrap();
         let mut conn_state = base_state.clone();
+        let domain_clone = domain.clone();
 
         tokio::spawn(async move {
             conn_state.peer_addr = match extract_peer_addr(&mut conn).await {
-                Ok(addr) => addr,
+                // Ok(addr) if !addr.is_private() => domain,
+                Ok(addr) if is_private(addr) => Some(Addr::Domain(domain_clone)),
+                Ok(ip) => Some(Addr::Ip(ip)),
                 Err(e) => {
                     debug!("could not extract peer address: {}, dropping connection", e);
                     return;

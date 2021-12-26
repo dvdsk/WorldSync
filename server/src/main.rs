@@ -10,7 +10,9 @@ struct Opt {
     #[structopt(long, default_value = "8080")]
     port: u16,
     #[structopt(long)]
-    admin_ui: bool
+    admin_ui: bool,
+    #[structopt(long)]
+    domain: String,
 }
 
 #[tokio::main]
@@ -37,5 +39,5 @@ async fn main() {
         server::host::monitor(host_state, events_clone, host_req_recv).await;
     });
 
-    server::host(sessions, user_db, world, opt.port, events, host_req).await;
+    server::host(sessions, user_db, world, opt.port, opt.domain, events, host_req).await;
 }

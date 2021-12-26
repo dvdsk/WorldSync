@@ -1,5 +1,5 @@
 use std::fmt;
-use std::net::SocketAddr;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
 use wrapper::parser::Line;
@@ -64,9 +64,31 @@ pub type HostId = Uuid;
 pub type SessionId = Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Addr {
+    Domain(String),
+    Ip(IpAddr),
+}
+
+impl Addr {
+    pub fn is_loopback(&self) -> bool {
+        match self {
+            Self::Ip(addr) if addr.is_loopback() => true,
+            _ => false,
+        }
+    }
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Domain(s) => s.clone(),
+            Self::Ip(ip) => ip.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostDetails {
     pub name: String,
-    pub addr: SocketAddr,
+    pub addr: Addr,
+    pub port: u16,
     pub id: HostId,
 }
 
