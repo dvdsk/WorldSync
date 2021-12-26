@@ -33,7 +33,9 @@ impl SubStatus {
         self.active = false;
     }
     pub fn start(&mut self) {
-        assert!(!self.active, "subscription was already active");
+        if self.active {
+            return;
+        }
         self.active = true;
         self.id += 1;
     }

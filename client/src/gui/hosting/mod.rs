@@ -100,6 +100,7 @@ impl Page {
             Event::SaveRegisterd => {
                 self.last_save = Some(Instant::now());
                 self.uploading_sub.stop();
+                self.refresh_time.start();
             }
             Event::Tick => (),
         }
@@ -111,11 +112,11 @@ impl Page {
             let host_id = self.host_id;
             subs.push(world_upload::sub(self.rpc.clone(), id, host_id))
         }
-        // if let Some(_) = self.refresh_time.active() {
-        //     let tick_event = |_| Msg::HostingPage(Event::Tick);
-        //     let ticker = iced::time::every(Duration::from_secs(1)).map(tick_event);
-        //     subs.push(ticker)
-        // }
+        if let Some(_) = self.refresh_time.active() {
+            let tick_event = |_| Msg::HostingPage(Event::Tick);
+            let ticker = iced::time::every(Duration::from_secs(1)).map(tick_event);
+            subs.push(ticker)
+        }
         if let Some(_) = self.save_periodically.active() {
             let save_event = |_| Msg::HostingPage(Event::PeriodicSave);
             let periodic = iced::time::every(Duration::from_secs(1 * 60)).map(save_event);
