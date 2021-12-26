@@ -1,6 +1,7 @@
 use std::fmt;
 use std::net::IpAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
 use wrapper::parser::Line;
 
@@ -44,10 +45,14 @@ pub enum Error {
     NotHost,
 }
 
+// if larger the underlying transport may time out it seems...?
+pub const AWAIT_EVENT_TIMEOUT: Duration = Duration::from_secs(1*60);
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
     #[cfg(not(feature = "deployed"))]
     TestHB(usize),
+    AwaitTimeout,
     NewHost(HostDetails),
     HostLoading(u8),
     HostLoaded,

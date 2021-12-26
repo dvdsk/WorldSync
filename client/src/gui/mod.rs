@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::{events, mc, world_dl, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
@@ -35,7 +33,6 @@ pub struct State {
     server_events: bool,
     downloading_world: SubStatus,
     mc_server: SubStatus,
-    save_periodically: SubStatus,
 }
 
 impl State {
@@ -52,7 +49,6 @@ impl State {
             server_events: false,
             downloading_world: SubStatus::default(),
             mc_server: SubStatus::default(),
-            save_periodically: SubStatus::default(),
         }
     }
 }
@@ -87,7 +83,7 @@ impl Application for State {
     ) -> Command<Self::Message> {
         use Event::*;
 
-        match message {
+        match dbg!(message) {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
             HostingPage(event) => {
@@ -165,11 +161,6 @@ impl Application for State {
         }
         if let Some(_id) = self.mc_server.active() {
             subs.push(mc::sub())
-        }
-        if let Some(_id) = self.save_periodically.active() {
-            let save_event = |_| Event::HostingPage(hosting::Event::PeriodicSave);
-            let periodic = iced::time::every(Duration::from_secs(1 * 60)).map(save_event);
-            subs.push(periodic)
         }
 
         Subscription::batch(subs)

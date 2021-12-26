@@ -6,7 +6,7 @@ use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
 use wrapper::parser::Line;
 
 use super::ConnState;
-use protocol::{Error, Event};
+use protocol::{Error, Event, AWAIT_EVENT_TIMEOUT};
 use protocol::{HostDetails, HostId, HostState, Service, SessionId, User, UserId};
 use shared::tarpc;
 use tarpc::context;
@@ -42,7 +42,10 @@ impl Service for ConnState {
                 Err(Error::IncorrectLogin)
             }
             Err(DbError::IncorrectName) => {
-                warn!("Incorrect username ({}) from {:?}", username, self.peer_addr);
+                warn!(
+                    "Incorrect username ({}) from {:?}",
+                    username, self.peer_addr
+                );
                 Err(Error::IncorrectLogin)
             }
             Err(e) => Err(e.into()),
@@ -121,10 +124,14 @@ impl Service for ConnState {
 
         let mut backlog = backlog.try_lock_owned().map_err(|_| Error::BackLogLocked)?;
 
-        match backlog.recv().await {
-            Err(RecvError::Closed) => panic!("events queue got closed"),
-            Err(RecvError::Lagged(_)) => Err(Error::Lagging),
-            Ok(event) => Ok(event),
+        let timeout_res = tokio::time::timeout(AWAIT_EVENT_TIMEOUT, backlog.recv()).await;
+        match timeout_res {
+            Err(_elapsed) => Ok(Event::AwaitTimeout),
+            Ok(res) => match res {
+                Err(RecvError::Closed) => panic!("events queue got closed"),
+                Err(RecvError::Lagged(_)) => Err(Error::Lagging),
+                Ok(event) => Ok(event),
+            },
         }
     }
     async fn dir_update(
@@ -189,7 +196,12 @@ impl Service for ConnState {
     }
 
     #[instrument(err, skip(self))]
-    async fn pub_mc_line(self, _: context::Context, host_id: HostId, line: Line) -> Result<(), Error> {
+    async fn pub_mc_line(
+        self,
+        _: context::Context,
+        host_id: HostId,
+        line: Line,
+    ) -> Result<(), Error> {
         let _ = self.is_host(host_id).await?;
         match HostEvent::try_from(line) {
             Ok(event) => self.host_req.send(event).await.unwrap(),

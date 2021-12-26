@@ -61,7 +61,6 @@ impl State {
                     .update(host::Event::Loading(p), self.unwrap_rpc())
             }
             HostLoaded if self.page == Page::Host => {
-                self.save_periodically.start();
                 self.page = Page::Hosting;
             }
             NewHost(host) => match self.can_host.is_us(&host) {
@@ -75,7 +74,7 @@ impl State {
                     self.page = Page::Join;
                 }
             },
-            HostDropped | HostCanceld | HostShutdown => self.page = Page::Host,
+            HostDropped | HostCanceld | HostShutdown => self.page = dbg!(Page::Host),
             #[cfg(not(feature = "deployed"))]
             TestHB(n) => info!("recieved hb {}", n),
             _e => if let Some(p) = self.can_join.as_mut() {
