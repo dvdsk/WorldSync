@@ -1,5 +1,7 @@
-use std::net::SocketAddr;
+use std::fmt;
+use std::net::IpAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
 use wrapper::parser::Line;
 
@@ -9,7 +11,7 @@ pub use time;
 pub use uuid::Uuid;
 
 mod connect;
-pub use connect::connect;
+pub use connect::{connect, connect_local};
 
 #[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum Error {
@@ -43,10 +45,14 @@ pub enum Error {
     NotHost,
 }
 
+// if larger the underlying transport may time out it seems...?
+pub const AWAIT_EVENT_TIMEOUT: Duration = Duration::from_secs(1*60);
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
     #[cfg(not(feature = "deployed"))]
     TestHB(usize),
+    AwaitTimeout,
     NewHost(HostDetails),
     HostLoading(u8),
     HostLoaded,
@@ -63,9 +69,31 @@ pub type HostId = Uuid;
 pub type SessionId = Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Addr {
+    Domain(String),
+    Ip(IpAddr),
+}
+
+impl Addr {
+    pub fn is_loopback(&self) -> bool {
+        match self {
+            Self::Ip(addr) if addr.is_loopback() => true,
+            _ => false,
+        }
+    }
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Domain(s) => s.clone(),
+            Self::Ip(ip) => ip.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostDetails {
     pub name: String,
-    pub addr: SocketAddr,
+    pub addr: Addr,
+    pub port: u16,
     pub id: HostId,
 }
 
@@ -97,14 +125,38 @@ impl User {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub struct Version {
-    pub protocol: String,
-    pub server: String,
+    semver: String,
+    commit: String,
+    branch: String,
+    build_date: String,
+    features: String,
+    profile: String,
 }
 
-pub fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "  version:")?;
+        writeln!(f, "     - semver: {}", self.semver)?;
+        writeln!(f, "     - commit: {}", self.commit)?;
+        writeln!(f, "     - branch: {}", self.branch)?;
+        writeln!(f, "  build_date: {}", self.build_date)?;
+        writeln!(f, "  features: {}", self.features)?;
+        writeln!(f, "  profile: {}", self.profile)?;
+        Ok(())
+    }
+}
+
+pub fn current_version() -> Version {
+    Version {
+        semver: env!("VERGEN_BUILD_SEMVER").to_string(),
+        commit: env!("VERGEN_GIT_SHA_SHORT").to_string(),
+        branch: env!("VERGEN_GIT_BRANCH").to_string(),
+        build_date: env!("VERGEN_BUILD_DATE").to_string(),
+        features: env!("VERGEN_CARGO_FEATURES").to_string(),
+        profile: env!("VERGEN_CARGO_PROFILE").to_string(),
+    }
 }
 
 use bincode::config::Options;

@@ -6,7 +6,7 @@ use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
 use wrapper::parser::Line;
 
 use super::ConnState;
-use protocol::{Error, Event};
+use protocol::{Error, Event, AWAIT_EVENT_TIMEOUT};
 use protocol::{HostDetails, HostId, HostState, Service, SessionId, User, UserId};
 use shared::tarpc;
 use tarpc::context;
@@ -16,10 +16,7 @@ use tracing::{info, instrument, warn};
 #[tarpc::server]
 impl Service for ConnState {
     async fn version(self, _: context::Context) -> protocol::Version {
-        protocol::Version {
-            protocol: protocol::version().to_owned(),
-            server: crate::version().to_owned(),
-        }
+        protocol::current_version()
     }
     async fn log_in(
         mut self,
@@ -39,13 +36,16 @@ impl Service for ConnState {
             }
             Err(DbError::IncorrectPass) => {
                 warn!(
-                    "Incorrect password for user: '{}' from {}",
+                    "Incorrect password for user: '{}' from {:?}",
                     username, self.peer_addr
                 );
                 Err(Error::IncorrectLogin)
             }
             Err(DbError::IncorrectName) => {
-                warn!("Incorrect username ({}) from {}", username, self.peer_addr);
+                warn!(
+                    "Incorrect username ({}) from {:?}",
+                    username, self.peer_addr
+                );
                 Err(Error::IncorrectLogin)
             }
             Err(e) => Err(e.into()),
@@ -94,6 +94,7 @@ impl Service for ConnState {
         Ok(self.world.host.state.read().await.clone())
     }
 
+    #[instrument(err, skip(self))]
     async fn request_to_host(
         self,
         _: context::Context,
@@ -102,11 +103,10 @@ impl Service for ConnState {
     ) -> Result<(), Error> {
         let user_id = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let name = self.userdb.get_name(user_id)?.unwrap();
-        let mut addr = self.peer_addr;
-        addr.set_port(25565);
         let details = HostDetails {
             name,
-            addr,
+            addr: self.peer_addr(),
+            port: 25565,
             id: host_id,
         };
         self.host_req
@@ -124,10 +124,14 @@ impl Service for ConnState {
 
         let mut backlog = backlog.try_lock_owned().map_err(|_| Error::BackLogLocked)?;
 
-        match backlog.recv().await {
-            Err(RecvError::Closed) => panic!("events queue got closed"),
-            Err(RecvError::Lagged(_)) => Err(Error::Lagging),
-            Ok(event) => Ok(event),
+        let timeout_res = tokio::time::timeout(AWAIT_EVENT_TIMEOUT, backlog.recv()).await;
+        match timeout_res {
+            Err(_elapsed) => Ok(Event::AwaitTimeout),
+            Ok(res) => match res {
+                Err(RecvError::Closed) => panic!("events queue got closed"),
+                Err(RecvError::Lagged(_)) => Err(Error::Lagging),
+                Ok(event) => Ok(event),
+            },
         }
     }
     async fn dir_update(
@@ -139,6 +143,7 @@ impl Service for ConnState {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         Ok(self.world.get_update(dir))
     }
+    #[instrument(err, skip(self, dir))]
     async fn new_save(
         self,
         _: context::Context,
@@ -151,6 +156,7 @@ impl Service for ConnState {
         Ok(self.world.new_save(dir))
     }
 
+    #[instrument(err, skip(self, save))]
     async fn register_save(
         self,
         _: context::Context,
@@ -190,16 +196,13 @@ impl Service for ConnState {
     }
 
     #[instrument(err, skip(self))]
-    async fn pub_mc_line(self, _: context::Context, id: HostId, line: Line) -> Result<(), Error> {
-        match &*self.world.host.state.read().await {
-            HostState::Up(host) | HostState::Loading(host) => {
-                if host.id != id {
-                    return Err(Error::NotHost);
-                }
-            }
-            _ => return Err(Error::NotHost),
-        }
-
+    async fn pub_mc_line(
+        self,
+        _: context::Context,
+        host_id: HostId,
+        line: Line,
+    ) -> Result<(), Error> {
+        let _ = self.is_host(host_id).await?;
         match HostEvent::try_from(line) {
             Ok(event) => self.host_req.send(event).await.unwrap(),
             Err(_) => (), // unprocessed line
@@ -213,7 +216,7 @@ impl Service for ConnState {
         user: User,
         password: String,
     ) -> Result<(), Error> {
-        if !self.peer_addr.ip().is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         self.userdb.add_user(user.clone(), password).await?;
@@ -222,7 +225,7 @@ impl Service for ConnState {
     }
 
     async fn list_users(self, _: context::Context) -> Result<Vec<(UserId, User)>, Error> {
-        if !self.peer_addr.ip().is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         Ok(self.userdb.get_userlist()?)
@@ -235,7 +238,7 @@ impl Service for ConnState {
         old: User,
         new: User,
     ) -> Result<(), Error> {
-        if !self.peer_addr.ip().is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         self.userdb.update_user(id, old.clone(), new).await?;
@@ -249,7 +252,7 @@ impl Service for ConnState {
         user_id: UserId,
         new_password: String,
     ) -> Result<(), Error> {
-        if !self.peer_addr.ip().is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
 
@@ -262,7 +265,7 @@ impl Service for ConnState {
     }
 
     async fn remove_account(mut self, _: context::Context, id: UserId) -> Result<(), Error> {
-        if !self.peer_addr.ip().is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
         let name = self.userdb.remove_user(id).await?;
@@ -271,7 +274,7 @@ impl Service for ConnState {
     }
 
     async fn dump_save(self, _: context::Context, dir: PathBuf) -> Result<(), Error> {
-        if !self.peer_addr.ip().is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
 
@@ -285,7 +288,7 @@ impl Service for ConnState {
     }
 
     async fn set_save(self, _: context::Context, dir: PathBuf) -> Result<(), Error> {
-        if !self.peer_addr.ip().is_loopback() {
+        if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
         }
 

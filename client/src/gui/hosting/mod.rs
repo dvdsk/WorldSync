@@ -6,7 +6,7 @@ use crate::{mc, world_upload};
 use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
 use protocol::HostId;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 mod tasks;
 
@@ -40,6 +40,7 @@ pub enum Event {
     Uploading(usize),
     UploadDone,
     SaveRegisterd,
+    Tick,
 }
 
 impl ClearError for Event {
@@ -56,11 +57,16 @@ pub struct Page {
     uploading: Loading,
     last_save: Option<Instant>,
     uploading_sub: SubStatus,
+    refresh_time: SubStatus,
+    save_periodically: SubStatus,
     rpc: RpcConn,
 }
 
 impl Page {
     pub fn from(server: Arc<wrapper::Handle>, host_id: HostId, rpc: RpcConn) -> Self {
+        let mut save_periodically = SubStatus::default();
+        save_periodically.start();
+
         Self {
             errorbar: ErrorBar::default(),
             mc_handle: Arc::try_unwrap(server)
@@ -69,6 +75,8 @@ impl Page {
             uploading: Loading::default(),
             last_save: None,
             uploading_sub: SubStatus::default(),
+            refresh_time: SubStatus::default(),
+            save_periodically,
             rpc,
         }
     }
@@ -92,7 +100,9 @@ impl Page {
             Event::SaveRegisterd => {
                 self.last_save = Some(Instant::now());
                 self.uploading_sub.stop();
+                self.refresh_time.start();
             }
+            Event::Tick => (),
         }
         Command::none()
     }
@@ -101,6 +111,16 @@ impl Page {
         if let Some(id) = self.uploading_sub.active() {
             let host_id = self.host_id;
             subs.push(world_upload::sub(self.rpc.clone(), id, host_id))
+        }
+        if let Some(_) = self.refresh_time.active() {
+            let tick_event = |_| Msg::HostingPage(Event::Tick);
+            let ticker = iced::time::every(Duration::from_secs(1)).map(tick_event);
+            subs.push(ticker)
+        }
+        if let Some(_) = self.save_periodically.active() {
+            let save_event = |_| Msg::HostingPage(Event::PeriodicSave);
+            let periodic = iced::time::every(Duration::from_secs(1 * 60)).map(save_event);
+            subs.push(periodic)
         }
     }
 
@@ -139,8 +159,13 @@ fn title() -> Text {
 fn last_save(at: Option<Instant>) -> Text {
     let text = match at {
         Some(instant) => {
-            let minutes = instant.elapsed() / 60;
-            format!("last save {:?} minutes ago", minutes)
+            let elapsed = instant.elapsed().as_secs();
+            let min = elapsed / 60;
+            let secs = elapsed % 60;
+            match (min, secs) {
+                (0, s) => format!("last save {} seconds ago", s),
+                (m, s) => format!("last save {}:{} minutes ago", m, s),
+            }
         }
         None => "no save made yet".to_string(),
     };

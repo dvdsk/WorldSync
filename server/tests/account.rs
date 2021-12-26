@@ -3,7 +3,7 @@ use protocol::User;
 use shared::tarpc::context;
 
 mod util;
-use util::{free_port, test_conn, test_server};
+use util::{free_port, test_conn, spawn_test_server};
 
 async fn update(port: u16) {
     let client = test_conn(port).await;
@@ -32,10 +32,6 @@ async fn update(port: u16) {
 #[tokio::test]
 async fn update_user() {
     let port = free_port();
-    let server = test_server(port);
-
-    tokio::select! {
-        _ = server => panic!("server crashed during client test"),
-        r = update(port) => r,
-    };
+    spawn_test_server(port).await;
+    update(port).await;
 }

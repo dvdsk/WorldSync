@@ -5,6 +5,7 @@ pub use crate::Event as Msg;
 use crate::{world_dl, mc};
 use protocol::HostId;
 use iced::{Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text, button};
+use shared::tarpc::client::RpcError;
 
 use super::RpcConn;
 use super::parts::{ErrorBar, Loading};
@@ -13,8 +14,8 @@ mod tasks;
 
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Error {
-    #[error("Could not connect to WorldSync server")]
-    NoMetaConn,
+    #[error("Lost connection to worldsync server: {0:?}")]
+    NoMetaConn(#[from] RpcError),
     #[error("Error downloading world: {0}")]
     Sync(#[from] world_dl::Error),
     #[error("Could not start minecraft server: {0}")]
@@ -81,6 +82,7 @@ impl Page {
     }
 
     pub fn view(&mut self) -> Element<Msg> {
+        dbg!();
         let sidebar = Space::with_width(Length::FillPortion(4));
         let left_spacer = Space::with_width(Length::FillPortion(1));
         let top_spacer = Space::with_height(Length::FillPortion(1));

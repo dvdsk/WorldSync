@@ -1,13 +1,14 @@
 use crate::gui::{host, hosting, login, RpcConn};
 use crate::Error;
 use futures::stream::{self, BoxStream};
-use protocol::HostState;
+use protocol::{HostState, AWAIT_EVENT_TIMEOUT};
 use shared::tarpc::client::RpcError;
 use shared::tarpc::context::Context;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::{SystemTime, Duration};
+use tracing::instrument;
 
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -42,6 +43,7 @@ pub struct ServerSub {
 
 struct State {
     conn: RpcConn,
+    err: bool,
 }
 
 impl<H, I> iced_native::subscription::Recipe<H, I> for ServerSub
@@ -59,34 +61,42 @@ where
         Box::pin(stream::unfold(
             State {
                 conn: self.conn.replace(None).unwrap(),
+                err: false,
             },
             move |mut state| async move {
-                let event = await_event(&mut state.conn).await;
-                Some((event, state))
+                if state.err {
+                    None
+                } else {
+                    let event = match get_events(&mut state.conn).await {
+                        Err(err) => {
+                            state.err = true;
+                            Event::Error(err)
+                        }
+                        Ok(ev) => Event::from(ev),
+                    };
+                    Some((event, state))
+                }
             },
         ))
     }
 }
 
+#[instrument(err)]
 async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
     let mut context = Context::current();
     loop {
-        context.deadline = SystemTime::now() + Duration::from_secs(60 * 5);
+        context.deadline = SystemTime::now() + AWAIT_EVENT_TIMEOUT + Duration::from_secs(2);
         let res = conn.client.await_event(context, conn.session).await;
 
         match res {
-            Ok(event) => return Ok(event?),
+            Ok(event) => match event.unwrap() {
+                protocol::Event::AwaitTimeout => continue,
+                _event => return Ok(_event),
+            },
             Err(RpcError::DeadlineExceeded) => {
                 continue;
             }
-            Err(_) => return Err(Error::NoMetaConn),
+            Err(e) => return Err(Error::NoMetaConn(e)),
         }
-    }
-}
-
-async fn await_event(conn: &mut RpcConn) -> Event {
-    match get_events(conn).await {
-        Err(err) => Event::Error(err),
-        Ok(ev) => Event::from(ev),
     }
 }

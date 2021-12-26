@@ -7,6 +7,7 @@ use wrapper::{Config, Error, Instance};
 async fn fail_to_start() {
     shared::setup_tracing();
     std::fs::create_dir_all("tests/data/fail_to_start").unwrap();
+    std::fs::write("tests/data/fail_to_start/eula.txt", "eula=true").unwrap();
     let (mut instance, _handle) = Instance::start("tests/data/fail_to_start", 2)
         .await
         .unwrap();

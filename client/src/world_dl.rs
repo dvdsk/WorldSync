@@ -12,9 +12,7 @@ use tokio::io::AsyncWriteExt;
 use tracing::{error, info, instrument};
 
 use crate::gui::RpcConn;
-use crate::Event;
-
-pub const SERVER_PATH: &str = "server";
+use crate::{Event, server_path};
 
 pub fn sub(conn: RpcConn, count: usize) -> iced::Subscription<Event> {
     iced::Subscription::from_recipe(WorldDl {
@@ -44,18 +42,12 @@ struct State {
 
 #[derive(Clone, Debug, thiserror::Error, Eq, PartialEq, Hash)]
 pub enum Error {
-    #[error("Lost connection to meta conn")]
-    NoMetaConn,
+    #[error("Lost connection to meta conn: {0:?}")]
+    NoMetaConn(#[from] RpcError),
     #[error("Could not access local file system, is folder read only or hard drive full?")]
     Fs,
     #[error("{0}")]
     Protocol(#[from] protocol::Error),
-}
-
-impl From<RpcError> for Error {
-    fn from(_: RpcError) -> Self {
-        Error::NoMetaConn
-    }
 }
 
 impl From<sync::Error> for Error {
@@ -104,18 +96,17 @@ use crate::gui::host;
 impl State {
     #[instrument(err)]
     async fn get_dir_update(&mut self) -> Result<DirUpdate, Error> {
-        if !Path::new(SERVER_PATH).is_dir() {
-            let full_path = fs::canonicalize(SERVER_PATH).await.unwrap();
-            info!("created directory for server in: {:?}", full_path);
-            fs::create_dir(SERVER_PATH).await.unwrap();
+        if !Path::new(server_path()).is_dir() {
+            info!("created directory for server: {:?}", server_path());
+            fs::create_dir(server_path()).await.unwrap();
         }
-        let dir_content = dbg!(DirContent::from_dir(SERVER_PATH.into()).await?);
+        let dir_content = DirContent::from_dir(server_path().into()).await?;
         let dir_update = self
             .conn
             .client
             .dir_update(context::current(), self.conn.session, dir_content)
             .await??;
-        Ok(dbg!(dir_update))
+        Ok(dir_update)
     }
 
     async fn await_dir_update(mut self) -> (Event, Self) {
@@ -179,7 +170,7 @@ impl State {
 }
 
 fn local_path(remote_path: &Path) -> PathBuf {
-    Path::new(SERVER_PATH).join(remote_path)
+    Path::new(server_path()).join(remote_path)
 }
 
 #[instrument(err)]

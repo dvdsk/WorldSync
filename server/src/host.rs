@@ -1,32 +1,32 @@
-use std::net::SocketAddr;
 use std::sync::Arc;
 
-use protocol::{Event, HostDetails, HostState};
+use protocol::{Addr, Event, HostDetails, HostState};
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time::{self, sleep, Duration, Instant};
 use tracing::{error, info};
 
-async fn unreachable(addr: SocketAddr) {
+async fn unreachable(addr: &Addr, port: u16) {
     use async_minecraft_ping::ConnectionConfig;
-    async fn inner(addr: SocketAddr) -> Result<(), ()> {
+    async fn inner(addr: &Addr, port: u16) -> Result<(), ()> {
         loop {
             sleep(Duration::from_secs(5)).await;
-            let _status = ConnectionConfig::build(addr.ip().to_string())
-                .with_port(addr.port())
+            let _status = ConnectionConfig::build(addr.to_string())
+                .with_port(port)
                 .connect()
                 .await
                 .map_err(|_| ())?
-                .status().await;
+                .status()
+                .await;
         }
     }
 
-    let _ignore_res = inner(addr).await;
+    let _ignore_res = inner(addr, port).await;
 }
 
-async fn reachable(addr: SocketAddr) {
+async fn reachable(addr: &Addr, port: u16) {
     use async_minecraft_ping::ConnectionConfig;
-    while let Err(_) = ConnectionConfig::build(addr.ip().to_string())
-        .with_port(addr.port())
+    while let Err(_) = ConnectionConfig::build(addr.to_string())
+        .with_port(port)
         .connect()
         .await
     {
@@ -134,7 +134,7 @@ async fn shutdown_or_unreachable(
     events: &mut Reciever,
 ) -> HostState {
     tokio::select! {
-        _ = unreachable(host.addr) => {
+        _ = unreachable(&host.addr, host.port) => {
             let _irrelevant = broadcast.send(Event::HostUnreachable);
             info!("host unreachable, host: {:?}", host);
             HostState::Unreachable(host)
@@ -148,7 +148,12 @@ async fn shutdown_or_unreachable(
 }
 
 async fn up_or_timeout(host: HostDetails, broadcast: &mut BroadCast) -> HostState {
-    match time::timeout(Duration::from_secs(5 * 60), reachable(host.addr)).await {
+    match time::timeout(
+        Duration::from_secs(5 * 60),
+        reachable(&host.addr, host.port),
+    )
+    .await
+    {
         Ok(_) => {
             let _irrelevant = broadcast.send(Event::HostRestored);
             info!("unreachable host restored contact, host: {:?}", host);

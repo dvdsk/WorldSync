@@ -12,9 +12,7 @@ use tokio::fs;
 use tracing::{error, instrument};
 
 use crate::gui::{hosting, RpcConn};
-use crate::Event;
-
-pub const SERVER_PATH: &str = "server";
+use crate::{server_path, Event};
 
 pub fn sub(conn: RpcConn, count: usize, host_id: HostId) -> iced::Subscription<Event> {
     iced::Subscription::from_recipe(WorldUpload {
@@ -49,20 +47,14 @@ struct State {
 
 #[derive(Clone, Debug, thiserror::Error, Eq, PartialEq, Hash)]
 pub enum Error {
-    #[error("Lost connection to meta conn")]
-    NoMetaConn,
+    #[error("Lost connection to worldsync server: {0:?}")]
+    NoMetaConn(#[from] RpcError),
     #[error("Could not access local file system, is folder read only or hard drive full?")]
     Fs,
     #[error("{0}")]
     Protocol(#[from] protocol::Error),
     #[error("Could not sync save")]
     SyncError,
-}
-
-impl From<RpcError> for Error {
-    fn from(_: RpcError) -> Self {
-        Error::NoMetaConn
-    }
 }
 
 impl From<sync::Error> for Error {
@@ -116,9 +108,9 @@ where
 impl State {
     #[instrument(err)]
     async fn do_build_updatelist(&mut self) -> Result<(Save, UpdateList), Error> {
-        use crate::world_dl::SERVER_PATH;
-        let dir =
-            DirContent::from_dir(SERVER_PATH.into()).await.map_err(|_| Error::SyncError)?;
+        let dir = DirContent::from_dir(server_path().into())
+            .await
+            .map_err(|_| Error::SyncError)?;
         Ok(self
             .conn
             .client
@@ -130,7 +122,7 @@ impl State {
     async fn build_updatelist(mut self) -> (Event, Self) {
         let event = match self.do_build_updatelist().await {
             Ok((save, list)) => {
-                let num_obj = dbg!(list.0.len());
+                let num_obj = list.0.len();
                 self.object_list = Some(list);
                 self.save = Some(save);
                 self.phase = Phase::Uploading;
@@ -211,5 +203,5 @@ impl State {
 }
 
 fn local_path(remote_path: &Path) -> PathBuf {
-    Path::new(SERVER_PATH).join(remote_path)
+    Path::new(server_path()).join(remote_path)
 }

@@ -1,9 +1,24 @@
 use iced::Command;
-use tracing::info;
+use tracing::{info, warn};
+use std::fs;
 
 use crate::Event;
 
 use super::{RpcConn, State};
+
+pub fn open_settings() -> sled::Db {
+    use crate::db_path;
+    let dir = db_path().parent().unwrap();
+    fs::create_dir_all(dir).unwrap();
+    match sled::open(db_path()) {
+        Ok(db) => db,
+        Err(e) => {
+            warn!("error opening db: {:?}", e);
+            fs::remove_dir(db_path()).expect("could not remove corrupt db");
+            sled::open(db_path()).expect("could not open new db")
+        }
+    }
+}
 
 #[derive(Default, Clone)]
 pub struct SubStatus {
@@ -18,7 +33,9 @@ impl SubStatus {
         self.active = false;
     }
     pub fn start(&mut self) {
-        assert!(!self.active, "subscription was already active");
+        if self.active {
+            return;
+        }
         self.active = true;
         self.id += 1;
     }
@@ -46,7 +63,6 @@ impl State {
                     .update(host::Event::Loading(p), self.unwrap_rpc())
             }
             HostLoaded if self.page == Page::Host => {
-                self.save_periodically.start();
                 self.page = Page::Hosting;
             }
             NewHost(host) => match self.can_host.is_us(&host) {
@@ -60,7 +76,7 @@ impl State {
                     self.page = Page::Join;
                 }
             },
-            HostDropped | HostCanceld | HostShutdown => self.page = Page::Host,
+            HostDropped | HostCanceld | HostShutdown => self.page = dbg!(Page::Host),
             #[cfg(not(feature = "deployed"))]
             TestHB(n) => info!("recieved hb {}", n),
             _e => if let Some(p) = self.can_join.as_mut() {

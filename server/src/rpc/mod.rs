@@ -1,8 +1,7 @@
 use crate::db::user::UserDb;
 use crate::host::HostEvent;
 use crate::{Sessions, World};
-use protocol::{Error, Event, HostId, SessionId, UserId};
-use std::net::SocketAddr;
+use protocol::{Error, Event, HostId, SessionId, UserId, Addr};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 
@@ -10,7 +9,7 @@ mod calls;
 
 #[derive(Clone)]
 pub struct ConnState {
-    pub peer_addr: SocketAddr,
+    pub peer_addr: Option<Addr>,
     pub sessions: Sessions,
     pub events: Arc<broadcast::Sender<Event>>,
     pub userdb: UserDb,
@@ -19,6 +18,9 @@ pub struct ConnState {
 }
 
 impl ConnState {
+    pub fn peer_addr(&self) -> Addr {
+        self.peer_addr.clone().unwrap()
+    }
     pub fn get_user_id(&self, id: SessionId) -> Option<UserId> {
         self.sessions.get_user_id(id)
     }

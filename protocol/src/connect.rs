@@ -4,6 +4,7 @@ use tarpc::client::Config;
 use crate::ServiceClient;
 use tarpc::tokio_serde::formats::Bincode;
 use tokio::net::TcpStream;
+use tracing::instrument;
 
 #[cfg(feature = "deployed")]
 use tokio_rustls::{client::TlsStream, rustls, TlsConnector};
@@ -29,12 +30,26 @@ async fn connect_tcp(domain: &str, port: u16) -> Result<TlsStream<TcpStream>, st
 }
 
 #[cfg(not(feature = "deployed"))]
-async fn connect_tcp(_domain: &str, port: u16) -> Result<TcpStream, std::io::Error> {
-    TcpStream::connect(format!("127.0.0.1:{}", port)).await
+#[instrument(err)]
+async fn connect_tcp(domain: &str, port: u16) -> Result<TcpStream, std::io::Error> {
+    TcpStream::connect(format!("{}:{}", domain, port)).await
 }
 
+#[instrument(err)]
 pub async fn connect(domain: &str, port: u16) -> Result<ServiceClient, std::io::Error> {
     let conn = connect_tcp(domain, port).await?;
+    use tokio_util::codec::length_delimited::LengthDelimitedCodec;
+    let mut codec_builder = LengthDelimitedCodec::builder();
+
+    let framed = codec_builder.max_frame_length(usize::MAX).new_framed(conn);
+    let transport = tarpc::serde_transport::new(framed, Bincode::default());
+    let client = ServiceClient::new(Config::default(), transport).spawn();
+    Ok(client)
+}
+
+#[instrument(err)]
+pub async fn connect_local(port: u16) -> Result<ServiceClient, std::io::Error> {
+    let conn = TcpStream::connect(format!("127.0.0.1:{}", port)).await?;
     use tokio_util::codec::length_delimited::LengthDelimitedCodec;
     let mut codec_builder = LengthDelimitedCodec::builder();
 
