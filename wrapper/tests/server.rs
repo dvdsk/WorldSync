@@ -5,7 +5,7 @@ use wrapper::{Config, Error, Instance};
 
 #[tokio::test]
 async fn fail_to_start() {
-    shared::setup_tracing();
+    shared::setup_test_tracing();
     std::fs::create_dir_all("tests/data/fail_to_start").unwrap();
     std::fs::write("tests/data/fail_to_start/eula.txt", "eula=true").unwrap();
     let (mut instance, _handle) = Instance::start("tests/data/fail_to_start", 2)
@@ -40,7 +40,7 @@ async fn setup_server(dir: &Path, port: u16) {
 #[tokio::test]
 #[ignore] // Ignore unless specifically requested (use -- --incude-ignored)
 async fn start_fresh_server() {
-    shared::setup_tracing();
+    shared::setup_test_tracing();
 
     let server_path = Path::new("tests/data/start_fresh");
     setup_server(server_path, 12387).await;
@@ -61,7 +61,7 @@ async fn start_fresh_server() {
 #[tokio::test]
 #[ignore] // Ignore unless specifically requested (use -- --incude-ignored)
 async fn saving() {
-    shared::setup_tracing();
+    shared::setup_test_tracing();
 
     let server_path = Path::new("tests/data/saving");
     setup_server(server_path, 34867).await;

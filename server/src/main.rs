@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use server::Sessions;
 use server::{World, db::user::UserDb};
 use tokio::sync::mpsc;
@@ -18,7 +20,7 @@ struct Opt {
 #[tokio::main]
 async fn main() {
     let opt = Opt::from_args();
-    shared::setup_tracing();
+    shared::setup_tracing(Path::new("logs"), "worldsync_server.log");
     println!("{}", protocol::current_version());
 
     if opt.admin_ui {

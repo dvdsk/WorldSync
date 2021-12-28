@@ -1,10 +1,10 @@
-use client::gui;
+use client::{gui, log_path};
 use iced::Application;
 #[cfg(not(feature = "deployed"))]
 use tracing::warn;
 
 pub fn main() -> iced::Result {
-    shared::setup_tracing();
+    shared::setup_tracing(log_path(), "worldsync.log");
     #[cfg(not(feature = "deployed"))]
     warn!("Running without deployed feature, can not connect to deployed servers");
 

@@ -9,7 +9,7 @@ use shared::tarpc::context;
 use sync::{DirContent, DirUpdate, ObjectId, SyncAction};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tracing::{error, info, instrument};
+use tracing::{debug, error, info, instrument};
 
 use crate::gui::RpcConn;
 use crate::{Event, server_path};
@@ -106,6 +106,7 @@ impl State {
             .client
             .dir_update(context::current(), self.conn.session, dir_content)
             .await??;
+        debug!("{:?}", dir_update);
         Ok(dir_update)
     }
 

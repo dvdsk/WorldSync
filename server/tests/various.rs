@@ -52,7 +52,7 @@ async fn req_client_with_header(port: u16) -> protocol::Version {
 
 #[tokio::test]
 async fn test_header_stripping() {
-    shared::setup_tracing() ;
+    shared::setup_test_tracing() ;
 
     let port = free_port();
     spawn_test_server(port).await;

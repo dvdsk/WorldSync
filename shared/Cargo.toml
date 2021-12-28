@@ -9,4 +9,5 @@ edition = "2021"
 
 tarpc = { git = "https://github.com/dvdsk/tarpc", features = ["full"] }
 tracing = "0.1"
+tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["registry"] }
