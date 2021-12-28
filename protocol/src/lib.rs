@@ -43,6 +43,8 @@ pub enum Error {
     NotEmpty,
     #[error("session is not currently hosting")]
     NotHost,
+    #[error("files with this path may not be changed by a client: {0}")]
+    ForbiddenPath(PathBuf),
 }
 
 // if larger the underlying transport may time out it seems...?

@@ -2,7 +2,7 @@ use crate::{events, mc, world_dl, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{HostState, ServiceClient, Uuid};
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 pub mod host;
 pub mod hosting;
@@ -61,6 +61,14 @@ enum Page {
     Join,
 }
 
+fn log_censored(msg: &Event) {
+    use login::Event as LEvent;
+    match msg {
+        Event::LoginPage(LEvent::Password(_)) => debug!("message: LoginPage(Password(censored))"),
+        _ => debug!("message: {:?}", msg),
+    }
+}
+
 type SubsList = Vec<Subscription<events::Event>>;
 
 impl Application for State {
@@ -83,7 +91,7 @@ impl Application for State {
     ) -> Command<Self::Message> {
         use Event::*;
 
-        debug!("message: {:?}", message);
+        log_censored(&message);
         match message {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),

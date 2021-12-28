@@ -153,6 +153,7 @@ impl Service for ConnState {
     ) -> Result<(Save, UpdateList), Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let _ = self.is_host(host_id).await?;
+        let _ = Self::verify_content_safe(&dir)?;
         Ok(self.world.new_save(dir))
     }
 
@@ -192,6 +193,7 @@ impl Service for ConnState {
     ) -> Result<(), Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let _ = self.is_host(host_id).await?;
+        let _ = Self::path_safe(&path)?;
         Ok(self.world.add_obj(object, path, &bytes).await?)
     }
 

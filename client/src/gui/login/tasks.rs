@@ -64,7 +64,7 @@ impl super::Inputs {
     }
 }
 
-#[instrument(err)]
+#[instrument(err, skip(password))]
 pub async fn login(
     domain: String,
     port: u16,
