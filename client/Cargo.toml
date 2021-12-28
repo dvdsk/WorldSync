@@ -15,6 +15,7 @@ serde = "1"
 bincode = "1"
 
 tracing = "0.1"
+structopt = { version = "0.3", default-features = false }
 tracing-subscriber = { version = "0.3", features = ["registry"] }
 derivative = "2"
 iced = { version = "0.3" , features = ["tokio"] }

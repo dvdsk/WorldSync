@@ -2,7 +2,7 @@ use crate::{events, mc, world_dl, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{HostState, ServiceClient, Uuid};
-use tracing::info;
+use tracing::{info, debug};
 
 pub mod host;
 pub mod hosting;
@@ -83,7 +83,8 @@ impl Application for State {
     ) -> Command<Self::Message> {
         use Event::*;
 
-        match dbg!(message) {
+        debug!("message: {:?}", message);
+        match message {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
             HostingPage(event) => {

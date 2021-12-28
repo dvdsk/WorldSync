@@ -1,11 +1,11 @@
 use std::thread;
 
-use client::gui;
+use client::{gui, log_path};
 use iced::Application;
 use server::util::spawn_test_server;
 
 fn main() {
-    shared::setup_tracing();
+    shared::setup_tracing(log_path(), "worldsync.log", shared::LogLevel::INFO);
 
     thread::spawn(|| {
         use tokio::runtime::Runtime;

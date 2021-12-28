@@ -47,23 +47,37 @@ fn filter(metadata: &Metadata) -> bool {
     }
 }
 
+use tracing_appender::non_blocking::WorkerGuard;
+/// keeps track of internal state needed for logging to work
+#[must_use = "must be kept till the end of the progam for logging to work"]
+pub struct Logging {
+    #[allow(dead_code)]
+    file_guard: WorkerGuard,
+}
+
 use tracing_appender::{non_blocking, rolling};
+pub use tracing_subscriber::filter::LevelFilter as LogLevel;
 use tracing_subscriber::{filter, fmt, prelude::*};
-pub fn setup_tracing(log_dir: &Path, log_name: &str) {
+pub fn setup_tracing(log_dir: &Path, log_name: &str, level: LogLevel) -> Logging {
     std::fs::create_dir_all("log_dir").unwrap();
     let file_appender = rolling::daily(log_dir, log_name);
 
-    let (non_blocking, _guard) = non_blocking(file_appender);
+    let (non_blocking, file_guard) = non_blocking(file_appender);
     let file = fmt::layer().pretty().with_writer(non_blocking);
     let stdout = fmt::layer().pretty();
 
     let filter_modules = filter::filter_fn(filter);
-    let _ignore_err = tracing_subscriber::registry()
+    tracing_subscriber::registry()
         .with(stdout)
         .with(file)
-        .with(filter::LevelFilter::INFO)
+        .with(level)
         .with(filter_modules)
-        .try_init();
+        .try_init()
+        .unwrap();
+
+    Logging {
+        file_guard,
+    }
 }
 
 pub fn setup_test_tracing() {
