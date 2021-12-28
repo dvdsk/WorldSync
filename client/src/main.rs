@@ -8,7 +8,7 @@ use structopt::StructOpt;
 #[structopt(name = "worldsync client")]
 struct Opt {
     /// Verbosity of the logging, options: TRACE, DEBUG, INFO, WARN or ERROR
-    #[structopt(short, long, default_value = "INFO")]
+    #[structopt(name = "log", default_value = "INFO")]
     log_level: shared::LogLevel,
 }
 

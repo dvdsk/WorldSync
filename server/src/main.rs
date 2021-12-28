@@ -20,14 +20,14 @@ struct Opt {
     #[structopt(long)]
     domain: String,
     /// Verbosity of the logging, options: TRACE, DEBUG, INFO, WARN or ERROR
-    #[structopt(short, long, default_value = "INFO")]
+    #[structopt(name = "log", default_value = "INFO")]
     log_level: shared::LogLevel,
 }
 
 #[tokio::main]
 async fn main() {
     let opt = Opt::from_args();
-    shared::setup_tracing(Path::new("logs"), "worldsync_server.log", opt.log_level);
+    let _log_guard = shared::setup_tracing(Path::new("logs"), "worldsync_server.log", opt.log_level);
     println!("{}", protocol::current_version());
 
     if opt.admin_ui {

@@ -82,7 +82,6 @@ impl Page {
     }
 
     pub fn view(&mut self) -> Element<Msg> {
-        dbg!();
         let sidebar = Space::with_width(Length::FillPortion(4));
         let left_spacer = Space::with_width(Length::FillPortion(1));
         let top_spacer = Space::with_height(Length::FillPortion(1));
