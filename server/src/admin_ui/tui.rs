@@ -222,8 +222,8 @@ impl Tui {
         }
 
         let mut context = Context::current();
-        context.deadline = SystemTime::now() + Duration::from_secs(60*5);
-        println!("started importing save, this might take up to 5 minutes");
+        context.deadline = SystemTime::now() + Duration::from_secs(60*20);
+        println!("started importing save, will be aborted after 5 minutes");
         self.client
             .set_save(context, path.clone())
             .await
