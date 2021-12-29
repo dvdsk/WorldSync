@@ -148,6 +148,16 @@ impl Application for State {
                 _ => panic!("should not recieve server events on other page"),
             },
             Server(event) => return self.handle_server_event(event),
+            Error(crate::Error::NoMetaConn(e)) => match self.page {
+                Page::Hosting => {
+                    return self
+                        .hosting
+                        .as_mut()
+                        .unwrap()
+                        .update(hosting::Event::Error(hosting::Error::LostConn))
+                }
+                _ => panic!("tmp error remove {:?}", e),
+            },
             Error(e) => panic!("tmp error remove {:?}", e),
             Empty => (),
         }

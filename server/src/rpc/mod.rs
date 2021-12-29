@@ -3,7 +3,6 @@ use crate::host::HostEvent;
 use crate::{Sessions, World};
 use protocol::{Error, Event, HostId, SessionId, UserId, Addr};
 use sync::DirContent;
-use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
@@ -18,13 +17,6 @@ pub struct ConnState {
     pub userdb: UserDb,
     pub world: World,
     pub host_req: mpsc::Sender<HostEvent>,
-}
-
-fn allowed_paths() -> HashSet<&'static Path> {
-    HashSet::from([
-        Path::new("world"),
-        Path::new("logs"),
-    ])
 }
 
 impl ConnState {
@@ -45,7 +37,7 @@ impl ConnState {
         self.world.is_host(id).await.map_err(|_| Error::NotHost)
     }
     pub fn verify_content_safe(content: &DirContent) -> Result<(), Error> {
-        let allowed = allowed_paths();
+        let allowed = protocol::allowed_paths();
         for file in &content.0 {
             if !allowed.contains(file.path.as_path()) {
                 return Err(Error::ForbiddenPath(file.path.clone()))
@@ -54,7 +46,7 @@ impl ConnState {
         Ok(())
     }
     pub fn path_safe(path: &Path) -> Result<(), Error> {
-        let allowed = allowed_paths();
+        let allowed = protocol::allowed_paths();
         if !allowed.contains(path) {
             return Err(Error::ForbiddenPath(path.into()));
         }

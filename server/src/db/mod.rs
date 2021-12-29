@@ -5,4 +5,5 @@ use typed_sled::sled;
 pub fn test_db() -> sled::Db {
     let config = sled::Config::new().temporary(true);
     config.open().unwrap()
+    // sled::open("db").unwrap()
 }

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use tokio::sync::mpsc;
 
-use super::{db, host, World, events_channel, Sessions};
+use super::{db, events_channel, host, Sessions, World};
 
 pub async fn spawn_test_server(port: u16) {
     use crate::db::user::UserDb;
@@ -15,10 +15,14 @@ pub async fn spawn_test_server(port: u16) {
 
     use protocol::User;
     for i in 0..10 {
-    userdb
-        .add_user(User::test_user(i), User::test_password(i))
-        .await
-        .expect("could not add test users");
+        match userdb
+            .add_user(User::test_user(i), User::test_password(i))
+            .await
+        {
+            Ok(_) => continue,
+            Err(db::user::Error::AlreadyExists) => continue,
+            Err(e) => panic!("{}", e),
+        }
     }
 
     let events = events_channel();

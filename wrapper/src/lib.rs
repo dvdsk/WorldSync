@@ -1,3 +1,4 @@
+use core::fmt;
 use derivative::Derivative;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -187,6 +188,19 @@ impl Handle {
             .lock()
             .await
             .write_all(b"/save-all\n")
+            .await
+            .map_err(|e| e.to_string())
+            .map_err(HandleError::Io)?;
+        Ok(())
+    }
+    /// sends a message to all players in the server chat, message
+    /// must be plain text
+    pub async fn say(&mut self, msg: impl fmt::Display) -> Result<(), HandleError> {
+        let cmd = format!("/say {}\n", msg);
+        self.0
+            .lock()
+            .await
+            .write_all(cmd.as_bytes())
             .await
             .map_err(|e| e.to_string())
             .map_err(HandleError::Io)?;

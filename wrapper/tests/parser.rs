@@ -186,3 +186,11 @@ fn parse_release_candidate() {
     let correct = Message::Version(Version::Rc(1,16,3));
     assert_eq!(line.msg, correct);
 }
+
+#[test]
+fn parse_chat() {
+    let input = r#"[17:44:44] [Server thread/INFO]: [Server] test"#;
+    let line = parse(input).unwrap();
+    let correct = Message::Chat{from: "Server".into(), msg: "test".into()};
+    assert_eq!(line.msg, correct);
+}
