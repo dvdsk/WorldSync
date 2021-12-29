@@ -1,6 +1,7 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::net::IpAddr;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::time::Duration;
 use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
 use wrapper::parser::Line;
@@ -43,10 +44,20 @@ pub enum Error {
     NotEmpty,
     #[error("session is not currently hosting")]
     NotHost,
+    #[error("files with this path may not be changed by a client: {0}")]
+    ForbiddenPath(PathBuf),
 }
 
-// if larger the underlying transport may time out it seems...?
-pub const AWAIT_EVENT_TIMEOUT: Duration = Duration::from_secs(1*60);
+pub fn allowed_paths() -> HashSet<&'static Path> {
+    HashSet::from([
+        Path::new("world"),
+        Path::new("logs"),
+    ])
+}
+
+// governs the maximum time between events, is used to detect connection
+// lost
+pub const AWAIT_EVENT_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {

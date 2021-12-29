@@ -1,5 +1,5 @@
-use crate::gui::style;
 use crate::gui::parts::ErrorBar;
+use crate::gui::style;
 pub use crate::Event as Msg;
 use iced::widget::Column;
 use iced::{button, text_input, Button, Checkbox, Command, Length, Row, Space, TextInput};
@@ -23,10 +23,10 @@ pub enum Error {
     #[error("Invalid username or password")]
     IncorrectLogin,
     #[error("Version incorrect, try updating")]
-    VersionMismatch{
+    VersionMismatch {
         our: protocol::Version,
         server: protocol::Version,
-    }
+    },
 }
 
 impl From<protocol::Error> for Error {
@@ -101,7 +101,6 @@ impl Inputs {
     }
 }
 
-
 pub struct Page {
     db: sled::Db,
     inputs: Inputs,
@@ -115,7 +114,16 @@ impl Page {
     pub fn new(db: sled::Db) -> Self {
         let inputs = Inputs::load(&db);
         let remember = inputs.is_some();
+        #[cfg(feature = "deployed")]
         let inputs = inputs.unwrap_or(Inputs::default());
+        #[cfg(not(feature = "deployed"))]
+        let inputs = {
+            let mut inputs = inputs.unwrap_or(Inputs::default());
+            inputs.server.value= "127.0.0.1:8080".into();
+            inputs.username.value = "TestUser_0".into();
+            inputs.password.value = "testpass0".into();
+            inputs
+        };
 
         Self {
             inputs,

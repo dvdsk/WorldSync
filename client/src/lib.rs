@@ -16,3 +16,6 @@ pub fn server_path() -> &'static Path {
 pub fn db_path() -> &'static Path {
     Path::new("worldsync/db")
 }
+pub fn log_path() -> &'static Path {
+    Path::new("worldsync/logs")
+}

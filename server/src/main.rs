@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use server::Sessions;
 use server::{World, db::user::UserDb};
 use tokio::sync::mpsc;
@@ -9,16 +11,23 @@ mod admin_ui;
 struct Opt {
     #[structopt(long, default_value = "8080")]
     port: u16,
+    /// do not start a server but run the included admin control 
+    /// text ui tool
     #[structopt(long)]
     admin_ui: bool,
+    /// domain that should be send to clients as host when the 
+    /// current host connects from the local network
     #[structopt(long)]
     domain: String,
+    /// Verbosity of the logging, options: TRACE, DEBUG, INFO, WARN or ERROR
+    #[structopt(name = "log", default_value = "INFO")]
+    log_level: shared::LogLevel,
 }
 
 #[tokio::main]
 async fn main() {
     let opt = Opt::from_args();
-    shared::setup_tracing();
+    let _log_guard = shared::setup_tracing(Path::new("logs"), "worldsync_server.log", opt.log_level);
     println!("{}", protocol::current_version());
 
     if opt.admin_ui {

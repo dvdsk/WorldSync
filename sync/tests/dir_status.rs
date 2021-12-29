@@ -6,7 +6,7 @@ use sync::{DirContent, FileStatus};
 
 #[tokio::test]
 async fn empty_dir() {
-    shared::setup_tracing();
+    shared::setup_test_tracing();
 
     DirBuilder::new()
         .recursive(true)
@@ -21,7 +21,7 @@ async fn empty_dir() {
 
 #[tokio::test]
 async fn dir_with_files() {
-    shared::setup_tracing();
+    shared::setup_test_tracing();
 
     DirBuilder::new()
         .recursive(true)

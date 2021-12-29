@@ -111,6 +111,14 @@ impl State {
         let dir = DirContent::from_dir(server_path().into())
             .await
             .map_err(|_| Error::SyncError)?;
+        let allowed = protocol::allowed_paths();
+        let dir: Vec<_> = dir
+            .0
+            .into_iter()
+            .filter(|file| allowed.contains(file.path.as_path()))
+            .collect();
+        let dir = DirContent(dir);
+
         Ok(self
             .conn
             .client

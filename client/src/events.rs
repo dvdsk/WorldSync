@@ -7,7 +7,7 @@ use shared::tarpc::context::Context;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 use tracing::instrument;
 
 #[derive(Debug, Clone)]
@@ -94,7 +94,7 @@ async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
                 _event => return Ok(_event),
             },
             Err(RpcError::DeadlineExceeded) => {
-                continue;
+                panic!("did not recieve event on time: {:?}", res);
             }
             Err(e) => return Err(Error::NoMetaConn(e)),
         }

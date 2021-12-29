@@ -2,7 +2,7 @@ use crate::{events, mc, world_dl, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{HostState, ServiceClient, Uuid};
-use tracing::info;
+use tracing::{debug, info};
 
 pub mod host;
 pub mod hosting;
@@ -61,6 +61,14 @@ enum Page {
     Join,
 }
 
+fn log_censored(msg: &Event) {
+    use login::Event as LEvent;
+    match msg {
+        Event::LoginPage(LEvent::Password(_)) => debug!("message: LoginPage(Password(censored))"),
+        _ => debug!("message: {:?}", msg),
+    }
+}
+
 type SubsList = Vec<Subscription<events::Event>>;
 
 impl Application for State {
@@ -83,7 +91,8 @@ impl Application for State {
     ) -> Command<Self::Message> {
         use Event::*;
 
-        match dbg!(message) {
+        log_censored(&message);
+        match message {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
             HostingPage(event) => {
@@ -139,6 +148,16 @@ impl Application for State {
                 _ => panic!("should not recieve server events on other page"),
             },
             Server(event) => return self.handle_server_event(event),
+            Error(crate::Error::NoMetaConn(e)) => match self.page {
+                Page::Hosting => {
+                    return self
+                        .hosting
+                        .as_mut()
+                        .unwrap()
+                        .update(hosting::Event::Error(hosting::Error::LostConn))
+                }
+                _ => panic!("tmp error remove {:?}", e),
+            },
             Error(e) => panic!("tmp error remove {:?}", e),
             Empty => (),
         }

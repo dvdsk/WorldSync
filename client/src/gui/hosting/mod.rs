@@ -22,6 +22,8 @@ pub enum Error {
     McSaveErr(#[from] wrapper::HandleError),
     #[error("Could not upload save: {0}")]
     Upload(#[from] crate::world_upload::Error),
+    #[error("Lost connection to metadata server")]
+    LostConn,
 }
 
 impl From<protocol::Error> for Error {
@@ -83,6 +85,10 @@ impl Page {
 
     pub fn update(&mut self, event: Event) -> Command<Msg> {
         match event {
+            Event::Error(Error::LostConn) => {
+                self.errorbar.add(Error::LostConn);
+                return self.notify_conn_lost();
+            }
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::PeriodicSave => {
@@ -156,17 +162,19 @@ fn title() -> Text {
         .horizontal_alignment(HorizontalAlignment::Center)
 }
 
+fn elapsed(at: Instant) -> String {
+    let elapsed = at.elapsed().as_secs();
+    let min = elapsed / 60;
+    let secs = elapsed % 60;
+    match (min, secs) {
+        (0, s) => format!("last save {} seconds ago", s),
+        (m, s) => format!("last save {}:{} minutes ago", m, s),
+    }
+}
+
 fn last_save(at: Option<Instant>) -> Text {
     let text = match at {
-        Some(instant) => {
-            let elapsed = instant.elapsed().as_secs();
-            let min = elapsed / 60;
-            let secs = elapsed % 60;
-            match (min, secs) {
-                (0, s) => format!("last save {} seconds ago", s),
-                (m, s) => format!("last save {}:{} minutes ago", m, s),
-            }
-        }
+        Some(instant) =>  format!("last save {}", elapsed(instant)),
         None => "no save made yet".to_string(),
     };
     Text::new(text)

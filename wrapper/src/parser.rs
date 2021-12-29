@@ -74,6 +74,10 @@ pub enum Message {
     Overloaded(Duration, usize),
     Exception(Exception),
     Stopping,
+    Chat {
+        from: String,
+        msg: String,
+    },
     Other(String),
 }
 
@@ -87,8 +91,11 @@ pub fn parse(input: impl Into<String> + AsRef<str>) -> Result<Line, Error> {
 peg::parser! {
     grammar line_parser() for str {
 
+        rule anything_left() -> String
+            = s:$([_]+![_]) { s.to_owned() }
+
         rule other_msg() -> Message
-            = s:$([_]+![_]) { Message::Other(s.to_owned()) }
+            = s:anything_left() { Message::Other(s) }
 
         rule percentage() -> u8
             = digits:$(['0'..='9']*<1,3>) {
@@ -218,9 +225,17 @@ peg::parser! {
             Message::Version(v)
         }
 
+        rule chat() -> Message
+            = "[" from:name() "] " msg:anything_left() {
+            Message::Chat {
+                from,
+                msg,
+            }
+        }
+
         rule msg() -> Message
             = loading() / done_loading() / overloaded() / eula() / joined() / left()
-             / kicked() / saved() / stopping() / exception() / version() / other_msg()
+             / kicked() / chat() / saved() / stopping() / exception() / version() / other_msg()
 
         rule info() -> Level
             = "INFO" { Level::Info }
