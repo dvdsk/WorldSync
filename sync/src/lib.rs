@@ -154,10 +154,10 @@ pub struct FileStatus {
 use tokio::sync::Semaphore;
 // maximum number of concurrent file operations, keeping a file in memory
 // might take a lot of memory and the operation (such as hashing) can
-// take quite some cpu. This limits such cases to 10 files (good for pi3)
+// take quite some cpu. This limits such cases (needed for pi3)
 //
 // an alternative would be to set the tokio max_blocking_threads lower (def 512)
-static CONCURRENT_FILE_OPS: Semaphore = Semaphore::const_new(2);
+static CONCURRENT_FILE_OPS: Semaphore = Semaphore::const_new(1);
 
 impl FileStatus {
     #[instrument(err)]

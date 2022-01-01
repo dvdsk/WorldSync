@@ -114,7 +114,7 @@ impl WorldDb {
         Self::retrieve_obj(id).await
     }
 
-    #[instrument(err)]
+    #[instrument(err, skip(bytes))]
     pub async fn add_obj(&self, id: ObjectId, path: PathBuf, bytes: &[u8]) -> Result<(), Error> {
         self.store_obj(id, path, bytes).await
     }
