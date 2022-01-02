@@ -151,19 +151,19 @@ pub struct FileStatus {
     pub hash: u64,
 }
 
-use tokio::sync::Semaphore;
 // maximum number of concurrent file operations, keeping a file in memory
 // might take a lot of memory and the operation (such as hashing) can
 // take quite some cpu. This limits such cases (needed for pi3)
 //
 // an alternative would be to set the tokio max_blocking_threads lower (def 512)
-static CONCURRENT_FILE_OPS: Semaphore = Semaphore::const_new(1);
+// use tokio::sync::Semaphore;
+// static CONCURRENT_FILE_OPS: Semaphore = Semaphore::const_new(1);
 
 impl FileStatus {
     #[instrument(err)]
     async fn new(path: PathBuf, base: PathBuf) -> Result<FileStatus, Error> {
         // limit the number of reads and hashes to save on memory
-        let _permit = CONCURRENT_FILE_OPS.acquire().await.unwrap();
+        // let _permit = CONCURRENT_FILE_OPS.acquire().await.unwrap();
         let mut file = File::open(&path).await?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes).await?;
