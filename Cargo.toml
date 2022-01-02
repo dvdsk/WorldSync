@@ -9,6 +9,6 @@ members = [
 	"server",
 ]
 
-[profile.deployed]
-inherits = "dev"
-opt-level = 3
+# [profile.deployed]
+# inherits = "dev"
+# opt-level = 3

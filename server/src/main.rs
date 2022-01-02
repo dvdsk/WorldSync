@@ -2,6 +2,7 @@ use std::path::Path;
 
 use server::Sessions;
 use server::{db::user::UserDb, World};
+use shared::LogLevel;
 use structopt::StructOpt;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
@@ -22,7 +23,7 @@ struct Opt {
     domain: String,
     /// Verbosity of the logging, options: TRACE, DEBUG, INFO, WARN or ERROR
     #[structopt(name = "log", default_value = "INFO")]
-    log_level: tracing::Level,
+    log_level: LogLevel,
 }
 
 fn main() {

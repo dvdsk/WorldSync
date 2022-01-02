@@ -84,11 +84,10 @@ dependencies = [
 
 [[package]]
 name = "async-minecraft-ping"
-version = "0.4.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7e9b24c3f280807ab70f026e99b052dbd7093af675e6999167a2b85009bebea"
+checksum = "668b459c14dd8d9ef21e296af3f2a3651ff7dc3536e092fb0b09e528daaa6d89"
 dependencies = [
- "anyhow",
  "async-trait",
  "serde",
  "serde_json",

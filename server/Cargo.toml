@@ -11,7 +11,7 @@ tokio-util = { version = "0.6", features = ["codec"] }
 ppp = "2"
 futures = { version = "0.3" }
 async-trait = "0.1"
-async-minecraft-ping = { version = "0.4" }
+async-minecraft-ping = { version = "0.8" }
 
 rand = "0.8"
 rust-argon2 = "0.8"
