@@ -47,7 +47,23 @@ impl SubStatus {
     }
 }
 
+macro_rules! unwrap_page {
+    ($memb:ident, $type:ty) => {
+        impl State {
+            pub fn $memb(&mut self) -> &mut $type {
+                self.$memb.as_mut().unwrap()
+            }
+        }
+    };
+}
+
+use crate::gui;
+unwrap_page!{hosting, gui::hosting::Page}
+unwrap_page!{can_join, gui::join::Page}
+unwrap_page!{can_host, gui::host::Page}
+
 impl State {
+
     pub fn unwrap_rpc(&self) -> RpcConn {
         self.rpc.as_ref().unwrap().clone()
     }
@@ -59,13 +75,13 @@ impl State {
         match event {
             HostLoading(p) if self.page == Page::Host => {
                 return self
-                    .can_host
-                    .update(host::Event::Loading(p), self.unwrap_rpc())
+                    .can_host()
+                    .update(host::Event::Loading(p))
             }
             HostLoaded if self.page == Page::Host => {
                 self.page = Page::Hosting;
             }
-            NewHost(host) => match self.can_host.is_us(&host) {
+            NewHost(host) => match self.can_host().is_us(&host) {
                 true => {
                     info!("attempting to host");
                     self.downloading_world.start();

@@ -47,25 +47,33 @@ impl ClearError for Event {
     }
 }
 
-#[derive(Default)]
 pub struct Page {
     errorbar: ErrorBar<Error>,
     host: button::State,
     downloading: Loading,
     loading_server: Loading,
+    rpc: RpcConn,
     pub host_id: Option<HostId>,
 }
 
 impl Page {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn from(rpc: RpcConn) -> Self {
+        Self {
+            errorbar: Default::default(),
+            host: Default::default(),
+            downloading: Default::default(),
+            loading_server: Default::default(),
+            rpc,
+            host_id: None,
+
+        }
     }
 
-    pub fn update(&mut self, event: Event, rpc: RpcConn) -> Command<Msg> {
+    pub fn update(&mut self, event: Event) -> Command<Msg> {
         match event {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
-            Event::WantToHost => return self.request_to_host(rpc),
+            Event::WantToHost => return self.request_to_host(),
             Event::ObjToSync{left} => self.downloading.set_progress(left as f32),
             Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32, 0.0),
             Event::WorldUpdated => {
@@ -74,7 +82,7 @@ impl Page {
             }
             Event::Loading(p) => self.loading_server.set_progress(p as f32),
             Event::Mc(event) => match event {
-                Ok(line) => return mc::send_line(line, rpc, self.host_id.unwrap()),
+                Ok(line) => return mc::send_line(line, self.rpc.clone(), self.host_id.unwrap()),
                 Err(e) => self.errorbar.add(e.into()),
             }
         }
