@@ -46,14 +46,17 @@ async fn dir_with_files() {
         FileStatus {
             path: PathBuf::from("subdir/applesaus"),
             hash: 469007863229145464,
+            size: 13,
         },
         FileStatus {
             path: PathBuf::from("foo.txt"),
             hash: 469007863229145464,
+            size: 13,
         },
         FileStatus {
             path: PathBuf::from("world1_mca.mca"),
             hash: 469007863229145464,
+            size: 13,
         },
     ]);
     correct.0.sort_by_key(|k| k.path.clone());

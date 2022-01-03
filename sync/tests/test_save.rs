@@ -50,18 +50,22 @@ fn remote_a() -> DirContent {
         FileStatus {
             path: PathBuf::from("none_existing_dir/applesaus"),
             hash: 2725998475414856250,
+            size: 0,
         },
         FileStatus {
             path: PathBuf::from("none_existing_dir/foo.txt"),
             hash: 42,
+            size: 0,
         },
         FileStatus {
             path: PathBuf::from("none_existing_dir/world1_mca.mca"),
             hash: 469007863229145464,
+            size: 0,
         },
         FileStatus {
             path: PathBuf::from("none_existing_dir/missing_in_b.mca"),
             hash: 4242,
+            size: 0,
         },
     ])
 }
@@ -72,18 +76,22 @@ fn remote_b() -> DirContent {
         FileStatus {
             path: PathBuf::from("none_existing_dir/applesaus"),
             hash: 2725998475414856250,
+            size: 0,
         },
         FileStatus {
             path: PathBuf::from("none_existing_dir/foo.txt"),
             hash: 10940344417258880963,
+            size: 0,
         },
         FileStatus {
             path: PathBuf::from("none_existing_dir/world1_mca.mca"),
             hash: 469007863229145464,
+            size: 0,
         },
         FileStatus {
             path: PathBuf::from("none_existing_dir/extra_file.mca"),
             hash: 4242,
+            size: 0,
         },
     ])
 }

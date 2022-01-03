@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+util = ["reqwest"]
 
 [dependencies]
+reqwest = { version = "0.11", optional = true }
 tokio = {version = "1", features = ["process", "io-util", "macros", "rt-multi-thread", "fs", "time"]}
 tracing = "0.1"
 thiserror = "1"
@@ -15,6 +18,5 @@ time = { version = "0.3", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
-reqwest = "0.11"
 rand = "0.8"
 shared = { path = "../shared" }

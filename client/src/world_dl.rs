@@ -101,6 +101,7 @@ impl State {
             fs::create_dir(server_path()).await.unwrap();
         }
         let dir_content = DirContent::from_dir(server_path().into()).await?;
+        debug!("{:?}", dir_content);
         let dir_update = self
             .conn
             .client

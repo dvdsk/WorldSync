@@ -12,6 +12,8 @@ use tokio::time::timeout;
 use tracing::{debug, instrument};
 
 mod config;
+#[cfg(feature="util")]
+pub mod util;
 pub mod parser;
 pub use config::Config;
 pub use parser::{Line, Message};

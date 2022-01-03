@@ -59,7 +59,7 @@ use tracing_appender::{non_blocking, rolling};
 pub use tracing_subscriber::filter::LevelFilter as LogLevel;
 use tracing_subscriber::{filter, fmt, prelude::*};
 pub fn setup_tracing(log_dir: &Path, log_name: &str, level: LogLevel) -> Logging {
-    std::fs::create_dir_all("log_dir").unwrap();
+    std::fs::create_dir_all(log_dir).unwrap();
     let file_appender = rolling::daily(log_dir, log_name);
 
     let (non_blocking, file_guard) = non_blocking(file_appender);

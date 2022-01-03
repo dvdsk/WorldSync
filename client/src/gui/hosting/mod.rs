@@ -167,8 +167,8 @@ fn elapsed(at: Instant) -> String {
     let min = elapsed / 60;
     let secs = elapsed % 60;
     match (min, secs) {
-        (0, s) => format!("last save {} seconds ago", s),
-        (m, s) => format!("last save {}:{} minutes ago", m, s),
+        (0, s) => format!("{} seconds ago", s),
+        (m, s) => format!("{}:{} minutes ago", m, s),
     }
 }
 
