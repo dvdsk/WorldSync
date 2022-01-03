@@ -23,6 +23,7 @@ use uuid::Uuid;
 pub mod admin_ui;
 pub mod db;
 pub mod host;
+#[cfg(feature = "util")]
 pub mod util;
 mod world;
 use db::user::UserDb;
