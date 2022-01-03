@@ -92,11 +92,11 @@ async fn send(line: wrapper::parser::Line, rpc: RpcConn, host_id: HostId) -> cra
     let res = rpc
         .client
         .pub_mc_line(Context::current(), host_id, line)
-        .await
-        .expect("rpc failure");
+        .await;
     match res {
-        Ok(_) => Event::Empty,
-        Err(protocol::Error::NotHost) => Event::HostingPage(hEvent::Error(hError::NotHost)),
+        Ok(Ok(_)) => Event::Empty,
+        Ok(Err(protocol::Error::NotHost)) => Event::HostingPage(hEvent::Error(hError::NotHost)),
+        Err(e) => Event::Error(e.into()),
         e_ => panic!("unexpected error: {:?}", e_),
     }
 }

@@ -25,7 +25,7 @@ pub struct RpcConn {
 pub struct State {
     login: login::Page,
     hosting: Option<hosting::Page>,
-    can_host: host::Page,
+    can_host: Option<host::Page>,
     can_join: Option<join::Page>,
     page: Page,
 
@@ -41,7 +41,7 @@ impl State {
         Self {
             login: login::Page::new(db.clone()),
             hosting: None,
-            can_host: host::Page::new(),
+            can_host: None,
             can_join: None,
             page: Page::Login,
 
@@ -94,13 +94,14 @@ impl Application for State {
         log_censored(&message);
         match message {
             LoginPage(event) => return self.login.update(event),
-            HostPage(event) => return self.can_host.update(event, self.unwrap_rpc()),
+            HostPage(event) => return self.can_host.as_mut().unwrap().update(event),
             HostingPage(event) => {
                 return self.hosting.as_mut().unwrap().update(event);
             }
             LoggedIn(rpc, host_state) => {
                 use HostState::*;
                 self.server_events = true;
+                self.can_host = Some(host::Page::from(rpc.clone()));
                 match host_state.clone() {
                     NoHost => {
                         info!("logged in, no one is hosting");
@@ -122,21 +123,21 @@ impl Application for State {
             WorldUpdated => {
                 self.mc_server.start();
                 return self
-                    .can_host
-                    .update(host::Event::WorldUpdated, self.unwrap_rpc());
+                    .can_host()
+                    .update(host::Event::WorldUpdated);
             }
             McHandle(handle) => {
                 self.hosting = Some(hosting::Page::from(
                     handle,
-                    self.can_host.host_id.unwrap(),
+                    self.can_host().host_id.unwrap(),
                     self.unwrap_rpc().clone(),
                 ))
             }
             Mc(event) => match self.page {
                 Page::Host => {
                     return self
-                        .can_host
-                        .update(host::Event::Mc(event), self.unwrap_rpc())
+                        .can_host()
+                        .update(host::Event::Mc(event))
                 }
                 Page::Hosting => {
                     return self
@@ -151,10 +152,13 @@ impl Application for State {
             Error(crate::Error::NoMetaConn(e)) => match self.page {
                 Page::Hosting => {
                     return self
-                        .hosting
-                        .as_mut()
-                        .unwrap()
+                        .hosting()
                         .update(hosting::Event::Error(hosting::Error::LostConn))
+                }
+                Page::Host => {
+                    return self
+                        .can_host()
+                        .update(host::Event::Error(host::Error::NoMetaConn(e)))
                 }
                 _ => panic!("tmp error remove {:?}", e),
             },
@@ -188,9 +192,9 @@ impl Application for State {
     fn view(&mut self) -> Element<Event> {
         match self.page {
             Page::Login => self.login.view(),
-            Page::Join => self.can_join.as_mut().unwrap().view(),
-            Page::Host => self.can_host.view(),
-            Page::Hosting => self.hosting.as_mut().unwrap().view(),
+            Page::Join => self.can_join().view(),
+            Page::Host => self.can_host().view(),
+            Page::Hosting => self.hosting().view(),
         }
     }
 }

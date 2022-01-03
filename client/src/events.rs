@@ -2,7 +2,6 @@ use crate::gui::{host, hosting, login, RpcConn};
 use crate::Error;
 use futures::stream::{self, BoxStream};
 use protocol::{HostState, AWAIT_EVENT_TIMEOUT};
-use shared::tarpc::client::RpcError;
 use shared::tarpc::context::Context;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
@@ -93,9 +92,6 @@ async fn get_events(conn: &mut RpcConn) -> Result<protocol::Event, Error> {
                 protocol::Event::AwaitTimeout => continue,
                 _event => return Ok(_event),
             },
-            Err(RpcError::DeadlineExceeded) => {
-                panic!("did not recieve event on time: {:?}", res);
-            }
             Err(e) => return Err(Error::NoMetaConn(e)),
         }
     }

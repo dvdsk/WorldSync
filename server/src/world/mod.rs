@@ -1,5 +1,7 @@
 use protocol::{HostId, HostState};
+use std::sync::Mutex;
 use std::path::PathBuf;
+use std::sync::Arc;
 use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save, UpdateList};
 use tracing::{debug, info, instrument};
 use typed_sled::sled;
@@ -9,6 +11,7 @@ use crate::db::world::WorldDb;
 #[derive(Clone, Debug)]
 pub struct World {
     db: WorldDb,
+    new_save: Arc<Mutex<Option<Save>>>,
     pub host: crate::host::Host,
 }
 
@@ -16,6 +19,7 @@ impl World {
     pub async fn from(db: sled::Db, host: crate::host::Host) -> Self {
         Self {
             db: WorldDb::from(db).await,
+            new_save: Arc::new(Mutex::new(None)),
             host,
         }
     }
@@ -62,12 +66,17 @@ impl World {
         }
     }
 
-    pub fn new_save(&self, content: DirContent) -> (Save, UpdateList) {
-        UpdateList::for_new_save(&self.db, content)
+    pub fn new_save(&mut self, content: DirContent) -> UpdateList {
+        let unchecked = UpdateList::for_new_save(&self.db, content);
+        let (save, list) = self.db.secure_save(unchecked);
+        *self.new_save.lock().unwrap() = Some(save);
+        list
     }
 
-    pub fn register_save(&self, save: Save) {
+    pub fn flush_save(&mut self) -> Result<(), protocol::Error> {
+        let save = self.new_save.lock().unwrap().take().ok_or(protocol::Error::NotSaving)?;
         self.db.push_save(save);
+        Ok(())
     }
 
     pub async fn set_save(&self, source: PathBuf) -> Result<(), protocol::Error> {

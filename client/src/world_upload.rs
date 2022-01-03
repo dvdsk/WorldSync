@@ -7,9 +7,9 @@ use futures::stream::{self, BoxStream};
 use protocol::HostId;
 use shared::tarpc::client::RpcError;
 use shared::tarpc::context;
-use sync::{DirContent, ObjectId, Save, UpdateList};
+use sync::{DirContent, ObjectId, UpdateList};
 use tokio::fs;
-use tracing::{error, instrument};
+use tracing::{error, instrument, debug};
 
 use crate::gui::{hosting, RpcConn};
 use crate::{server_path, Event};
@@ -42,7 +42,6 @@ struct State {
     phase: Phase,
     host_id: HostId,
     object_list: Option<UpdateList>,
-    save: Option<Save>,
 }
 
 #[derive(Clone, Debug, thiserror::Error, Eq, PartialEq, Hash)]
@@ -91,7 +90,6 @@ where
                 phase: Phase::Started,
                 host_id: self.host_id.take().unwrap(),
                 object_list: None,
-                save: None,
             },
             move |state| async move {
                 match state.phase {
@@ -107,32 +105,26 @@ where
 
 impl State {
     #[instrument(err)]
-    async fn do_build_updatelist(&mut self) -> Result<(Save, UpdateList), Error> {
+    async fn do_build_updatelist(&mut self) -> Result<UpdateList, Error> {
         let dir = DirContent::from_dir(server_path().into())
             .await
             .map_err(|_| Error::SyncError)?;
-        let allowed = protocol::allowed_paths();
-        let dir: Vec<_> = dir
-            .0
-            .into_iter()
-            .filter(|file| allowed.contains(file.path.as_path()))
-            .collect();
-        let dir = DirContent(dir);
+        assert_ne!(dir.len(), 0, "dircontent should never be empty");
 
-        Ok(self
+        let to_upload = self
             .conn
             .client
             .new_save(context::current(), self.conn.session, self.host_id, dir)
             .await
-            .expect("rpc error")?)
+            .expect("rpc error")?;
+        Ok(to_upload)
     }
 
     async fn build_updatelist(mut self) -> (Event, Self) {
         let event = match self.do_build_updatelist().await {
-            Ok((save, list)) => {
+            Ok(list) => {
                 let num_obj = list.0.len();
                 self.object_list = Some(list);
-                self.save = Some(save);
                 self.phase = Phase::Uploading;
                 hosting::Event::UploadStarting(num_obj)
             }
@@ -187,13 +179,13 @@ impl State {
 
     #[instrument(err)]
     async fn do_register_save(&mut self) -> Result<(), Error> {
+        debug!("{:?}", self);
         self.conn
             .client
             .register_save(
                 context::current(),
                 self.conn.session,
                 self.host_id,
-                self.save.take().unwrap(),
             )
             .await??;
         Ok(())

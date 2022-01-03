@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::db::world::WorldDb;
 use crate::host::HostEvent;
-use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
+use sync::{DirContent, DirUpdate, ObjectId,UpdateList};
 use wrapper::parser::Line;
 
 use super::ConnState;
@@ -145,30 +145,30 @@ impl Service for ConnState {
     }
     #[instrument(err, skip(self, dir))]
     async fn new_save(
-        self,
+        mut self,
         _: context::Context,
         id: SessionId,
         host_id: HostId,
         dir: DirContent,
-    ) -> Result<(Save, UpdateList), Error> {
+    ) -> Result<UpdateList, Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let _ = self.is_host(host_id).await?;
-        let _ = Self::verify_content_safe(&dir)?;
-        Ok(self.world.new_save(dir))
+        let list = self.world.new_save(dir);
+        Ok(list)
     }
 
-    #[instrument(err, skip(self, save))]
+    #[instrument(err, skip(self))]
     async fn register_save(
-        self,
+        mut self,
         _: context::Context,
         id: SessionId,
         host_id: HostId,
-        save: Save,
     ) -> Result<(), Error> {
-        let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
+        let id = self.get_user_id(id).ok_or(Error::SessionExpired)?;
         let _ = self.is_host(host_id).await?;
+        self.world.flush_save()?;
+        info!("user: {}, finished saving", id);
 
-        self.world.register_save(save);
         Ok(())
     }
 

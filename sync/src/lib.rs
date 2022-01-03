@@ -14,6 +14,7 @@ pub struct Object {
     pub org_path: PathBuf,
     hash: u64,
     pub id: ObjectId,
+    pub size: u64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -28,6 +29,13 @@ pub enum Error {
 pub struct Save(Vec<Object>);
 
 impl Save {
+    pub fn size(&self) -> u64 {
+        self.0.iter().map(|obj| obj.size).sum()
+    }
+    pub fn into_iter(self) -> impl Iterator<Item = Object> {
+        self.0.into_iter()
+    }
+
     pub fn new_empty() -> Self {
         Self(Vec::new())
     }
@@ -79,12 +87,8 @@ pub trait ObjectStore {
     type Error;
     fn new_obj_id(&self) -> ObjectId;
     fn contains(&self, key: &StoreKey) -> Option<ObjectId>;
-    async fn store_obj(
-        &self,
-        id: ObjectId,
-        path: PathBuf,
-        bytes: &[u8],
-    ) -> Result<(), Self::Error>;
+    async fn store_obj(&self, id: ObjectId, path: PathBuf, bytes: &[u8])
+        -> Result<(), Self::Error>;
     async fn retrieve_obj(id: ObjectId) -> Result<Vec<u8>, Self::Error>;
     fn store_path() -> &'static Path;
     fn obj_path(id: ObjectId) -> PathBuf {
@@ -95,6 +99,10 @@ pub trait ObjectStore {
 }
 
 impl UpdateList {
+    pub fn into_iter(self) -> impl Iterator<Item = (ObjectId, PathBuf)> {
+        self.0.into_iter()
+    }
+
     /// return the Save and determine the objects we need to add to be able
     /// to load the save later
     pub fn for_new_save(store: &impl ObjectStore, remote: DirContent) -> (Save, UpdateList) {
@@ -115,6 +123,7 @@ impl UpdateList {
                 org_path: file.path,
                 hash: file.hash,
                 id: obj_id,
+                size: file.size,
             })
         }
         (Save(new_save), UpdateList(new_objects))
@@ -149,16 +158,29 @@ pub struct FileStatus {
     /// relative path
     pub path: PathBuf,
     pub hash: u64,
+    pub size: u64,
 }
+
+// maximum number of concurrent file operations, keeping a file in memory
+// might take a lot of memory and the operation (such as hashing) can
+// take quite some cpu. This limits such cases (needed for pi3)
+//
+// an alternative would be to set the tokio max_blocking_threads lower (def 512)
+// use tokio::sync::Semaphore;
+// static CONCURRENT_FILE_OPS: Semaphore = Semaphore::const_new(1);
 
 impl FileStatus {
     #[instrument(err)]
     async fn new(path: PathBuf, base: PathBuf) -> Result<FileStatus, Error> {
+        // limit the number of reads and hashes to save on memory
+        // let _permit = CONCURRENT_FILE_OPS.acquire().await.unwrap();
         let mut file = File::open(&path).await?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes).await?;
+        let size = bytes.len() as u64;
 
         let hash = task::spawn_blocking(move || seahash::hash(&bytes));
+
         let path = path
             .strip_prefix(base)
             .map(|p| p.to_owned())
@@ -167,11 +189,16 @@ impl FileStatus {
         Ok(FileStatus {
             hash: hash.await.expect("error joining hash task"),
             path,
+            size,
         })
     }
 }
 
 impl DirContent {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     fn build_file_list(dir: &Path) -> Result<Vec<PathBuf>, Error> {
         let mut paths = Vec::new();
         for res in WalkDir::new(dir) {
@@ -206,4 +233,38 @@ impl DirContent {
 
         Ok(DirContent(checks))
     }
+}
+
+pub trait PathCheck {
+    fn is_safe(&self, path: impl AsRef<Path>) -> bool;
+}
+
+
+/// replace any path in self that is not on the allowed list with one
+/// of a known safe Save or remove the path if it is not in a previous
+/// Save or on the allowed list.
+pub fn secure_new_save(
+    unchecked: (Save, UpdateList),
+    safe: Save,
+    check: impl PathCheck, //HashSet<&Path>,
+) -> (Save, UpdateList) {
+    let mut safe_obj: HashMap<PathBuf, Object> = safe
+        .into_iter()
+        .map(|o| (o.org_path.clone(), o))
+        .collect();
+    let checked_save = unchecked
+        .0
+        .into_iter()
+        .filter_map(|obj| match check.is_safe(&obj.org_path) {
+            true => Some(obj),
+            false => safe_obj.remove(&obj.org_path),
+        })
+        .collect();
+    let checked_list = unchecked
+        .1
+        .into_iter()
+        .filter(|(_, path)| check.is_safe(path))
+        .collect();
+
+    (Save(checked_save), UpdateList(checked_list))
 }

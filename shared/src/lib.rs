@@ -14,7 +14,7 @@ pub fn context(seconds: u64) -> Context {
 fn filter(metadata: &Metadata) -> bool {
     if metadata
         .module_path()
-        .map(|p| p.contains("naga::front::spv"))
+        .map(|p| p.contains("naga::front::spv") || p.contains("wgpu_core::device"))
         .unwrap_or(false)
     {
         return false;
@@ -59,7 +59,7 @@ use tracing_appender::{non_blocking, rolling};
 pub use tracing_subscriber::filter::LevelFilter as LogLevel;
 use tracing_subscriber::{filter, fmt, prelude::*};
 pub fn setup_tracing(log_dir: &Path, log_name: &str, level: LogLevel) -> Logging {
-    std::fs::create_dir_all("log_dir").unwrap();
+    std::fs::create_dir_all(log_dir).unwrap();
     let file_appender = rolling::daily(log_dir, log_name);
 
     let (non_blocking, file_guard) = non_blocking(file_appender);
@@ -75,9 +75,7 @@ pub fn setup_tracing(log_dir: &Path, log_name: &str, level: LogLevel) -> Logging
         .try_init()
         .unwrap();
 
-    Logging {
-        file_guard,
-    }
+    Logging { file_guard }
 }
 
 pub fn setup_test_tracing() {

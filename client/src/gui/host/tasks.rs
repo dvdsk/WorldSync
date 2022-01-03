@@ -16,10 +16,10 @@ async fn request_to_host(rpc: RpcConn, host_id: HostId) -> Result<(), Error> {
 }
 
 impl Page {
-    pub fn request_to_host(&mut self, rpc: RpcConn) -> Command<Msg> {
+    pub fn request_to_host(&mut self) -> Command<Msg> {
         let host_id = HostId::new_v4();
         self.host_id = Some(host_id);
-        let task = request_to_host(rpc, host_id);
+        let task = request_to_host(self.rpc.clone(), host_id);
 
         Command::perform(task, move |res| match res {
             // if we became host we will get the msg via

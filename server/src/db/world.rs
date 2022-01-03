@@ -2,7 +2,7 @@ use core::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save, StoreKey};
+use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save, StoreKey, UpdateList};
 use tokio::fs;
 use tracing::instrument;
 use typed_sled::{sled, Tree};
@@ -114,12 +114,78 @@ impl WorldDb {
         Self::retrieve_obj(id).await
     }
 
-    #[instrument(err)]
+    #[instrument(err, skip(bytes))]
     pub async fn add_obj(&self, id: ObjectId, path: PathBuf, bytes: &[u8]) -> Result<(), Error> {
         self.store_obj(id, path, bytes).await
     }
 
     pub fn get_update_list(&self, dir: DirContent) -> DirUpdate {
         self.last_save().needed_update(dir)
+    }
+
+    pub fn secure_save(&self, unchecked: (Save, UpdateList)) -> (Save, UpdateList) {
+        sync::secure_new_save(unchecked, self.last_save(), McPaths)
+    }
+}
+
+pub struct McPaths;
+
+impl McPaths {
+    fn allowed_prefixes() -> [&'static Path; 2] {
+        [Path::new("world"), Path::new("logs")]
+    }
+    fn forbidden_prefixes() -> [&'static Path; 1] {
+        [Path::new("world/datapacks")]
+    }
+}
+
+impl sync::PathCheck for McPaths {
+    fn is_safe(&self, path: impl AsRef<Path>) -> bool {
+        if !Self::allowed_prefixes()
+            .iter()
+            .any(|prefix| path.as_ref().starts_with(prefix)) {
+            return false;
+        }
+
+        if Self::forbidden_prefixes()
+            .iter()
+            .any(|prefix| path.as_ref().starts_with(prefix)) {
+            return false;
+        }
+
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sync::PathCheck;
+
+    #[test]
+    fn allow_paths() {
+        let paths = [
+            "world/level.dat",
+            "world/data/raids.dat",
+            "world/entities/r.0.0.mca",
+            "world/entities/r.0.-1.mca",
+            "world/entities/r.-1.0.mca",
+            "world/DIM1/data/raids_end.dat",
+        ];
+        for path in paths {
+            assert!(McPaths.is_safe(path));
+        }
+    }
+
+    #[test]
+    fn deny_path() {
+        let paths = [
+            "banned-ips.json",
+            "libraries/com/mojang/datafixerupper/4.0.26/datafixerupper-4.0.26.jar",
+            "libraries/net/java/dev/jna/jna/5.9.0/jna-5.9.0.jar",
+        ];
+        for path in paths {
+            assert!(!McPaths.is_safe(path));
+        }
     }
 }

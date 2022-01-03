@@ -1,9 +1,8 @@
-use std::collections::HashSet;
 use std::fmt;
 use std::net::IpAddr;
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 use std::time::Duration;
-use sync::{DirContent, DirUpdate, ObjectId, Save, UpdateList};
+use sync::{DirContent, DirUpdate, ObjectId, UpdateList};
 use wrapper::parser::Line;
 
 use serde::{Deserialize, Serialize};
@@ -46,13 +45,8 @@ pub enum Error {
     NotHost,
     #[error("files with this path may not be changed by a client: {0}")]
     ForbiddenPath(PathBuf),
-}
-
-pub fn allowed_paths() -> HashSet<&'static Path> {
-    HashSet::from([
-        Path::new("world"),
-        Path::new("logs"),
-    ])
+    #[error("not creating a new save")]
+    NotSaving,
 }
 
 // governs the maximum time between events, is used to detect connection
@@ -193,8 +187,8 @@ pub trait Service {
         id: SessionId,
         host_id: HostId,
         dir: DirContent,
-    ) -> Result<(Save, UpdateList), Error>;
-    async fn register_save(id: SessionId, host_id: HostId, save: Save) -> Result<(), Error>;
+    ) -> Result<UpdateList, Error>;
+    async fn register_save(id: SessionId, host_id: HostId) -> Result<(), Error>;
     async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
     async fn put_object(
         id: SessionId,
