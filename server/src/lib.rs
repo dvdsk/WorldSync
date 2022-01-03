@@ -1,4 +1,4 @@
-use protocol::{Event, Addr};
+use protocol::{Addr, Event};
 use shared::tarpc::server::BaseChannel;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
@@ -85,6 +85,8 @@ pub fn events_channel() -> Arc<broadcast::Sender<Event>> {
 pub enum Error {
     #[error("invalid header: {0:?}")]
     InvalidAddressType(ppp::v2::Addresses),
+    #[error("could not determine address from connection: {0:?}")]
+    AddrExtraction(std::io::ErrorKind),
 }
 
 pub async fn extract_peer_addr(conn: &mut TcpStream) -> Result<IpAddr, Error> {
@@ -98,7 +100,11 @@ pub async fn extract_peer_addr(conn: &mut TcpStream) -> Result<IpAddr, Error> {
     let (len, addr) = match HeaderResult::parse(&buf) {
         HeaderResult::V1(_) => {
             debug!("proxy protocol header is not supported, assuming none is present");
-            return Ok(conn.peer_addr().unwrap().ip());
+            return Ok(conn
+                .peer_addr()
+                .map_err(|e| e.kind())
+                .map_err(Error::AddrExtraction)?
+                .ip());
         }
         HeaderResult::V2(Ok(header)) => {
             use ppp::v2::Addresses::*;
@@ -112,7 +118,13 @@ pub async fn extract_peer_addr(conn: &mut TcpStream) -> Result<IpAddr, Error> {
         HeaderResult::V2(Err(e)) if e.is_incomplete() => {
             panic!("header incomplete need more bytes")
         }
-        _ => return Ok(conn.peer_addr().unwrap().ip()),
+        _ => {
+            return Ok(conn
+                .peer_addr()
+                .map_err(|e| e.kind())
+                .map_err(Error::AddrExtraction)?
+                .ip())
+        }
     };
 
     let mut buf = [0u8; 512];
@@ -180,7 +192,9 @@ pub async fn host(
                 }
             };
 
-            let framed = codec_builder.max_frame_length(100 * 1024 * 1024).new_framed(conn);
+            let framed = codec_builder
+                .max_frame_length(100 * 1024 * 1024)
+                .new_framed(conn);
 
             use tarpc::serde_transport as transport;
             let transport = transport::new(framed, Bincode::default());
