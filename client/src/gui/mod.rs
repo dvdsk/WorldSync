@@ -61,9 +61,10 @@ enum Page {
     Join,
 }
 
-fn log_censored(msg: &Event) {
+fn log_event(msg: &Event) {
     use login::Event as LEvent;
     match msg {
+        Event::Empty => tracing::trace!("message: {:?}", msg),
         Event::LoginPage(LEvent::Password(_)) => debug!("message: LoginPage(Password(censored))"),
         _ => debug!("message: {:?}", msg),
     }
@@ -91,7 +92,7 @@ impl Application for State {
     ) -> Command<Self::Message> {
         use Event::*;
 
-        log_censored(&message);
+        log_event(&message);
         match message {
             LoginPage(event) => return self.login.update(event),
             HostPage(event) => return self.can_host.as_mut().unwrap().update(event),
