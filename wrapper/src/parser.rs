@@ -81,8 +81,8 @@ pub enum Message {
     Other(String),
 }
 
-/// Incomplete parser, will return Error on non matching lines, these should be 
-/// logged or discarded by the caller
+/// Minecraft server log parser, it should parse any message in the format [time] [source] msg
+/// When parsing a complete minecraft log the msgs from Java should be discarded first.
 pub fn parse(input: impl Into<String> + AsRef<str>) -> Result<Line, Error> {
     line_parser::line(input.as_ref())
         .map_err(|error| Error::ParsingError{line: input.into(), error})

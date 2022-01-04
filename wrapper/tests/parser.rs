@@ -194,3 +194,11 @@ fn parse_chat() {
     let correct = Message::Chat{from: "Server".into(), msg: "test".into()};
     assert_eq!(line.msg, correct);
 }
+
+#[test]
+fn parse_log() {
+    let input = include_str!("minecraft.log");
+    for line in input.lines().skip(1) {
+        parse(line).unwrap();
+    }
+}

@@ -12,9 +12,9 @@ use tokio::time::timeout;
 use tracing::{debug, instrument};
 
 mod config;
-#[cfg(feature="util")]
-pub mod util;
 pub mod parser;
+#[cfg(feature = "util")]
+pub mod util;
 pub use config::Config;
 pub use parser::{Line, Message};
 
@@ -37,6 +37,8 @@ pub enum Error {
     OutdatedJava { required: String },
     #[error("Eula not accepted")]
     EulaUnaccepted(&'static str),
+    #[error("Unparsable output from minecraft server")]
+    Unparsable(parser::Error),
 }
 
 #[derive(Derivative)]
@@ -99,19 +101,37 @@ impl Instance {
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| Error::SpawnFailed(e.kind()))?;
+        debug!("spawned java process");
 
         let stdin = wait_for(&mut child.stdin).await;
         let stdout = BufReader::new(wait_for(&mut child.stdout).await).lines();
         let stderr = BufReader::new(wait_for(&mut child.stderr).await).lines();
 
-        let instance = Self {
+        let mut instance = Self {
             _process: child,
             working_dir,
             stdout,
             stderr,
         };
+        instance.discard_class_msg().await?;
         let handle = Handle::from(stdin);
         Ok((instance, handle))
+    }
+
+    #[instrument(err)]
+    async fn discard_class_msg(&mut self) -> Result<(), Error> {
+        use parser::Error::ParsingError;
+        use Error::Unparsable;
+
+        const CLASS_MSG: &str = "Starting net.minecraft.server.Main";
+        match self.next_event().await {
+            Err(Unparsable(ParsingError { line, .. })) if line == CLASS_MSG => Ok(()),
+            Err(e) => Err(e),
+            Ok(parsed) => panic!(
+                "Should not be able to parse first java msg, got: {:?}",
+                parsed
+            ),
+        }
     }
 
     #[instrument(err)]
@@ -123,7 +143,7 @@ impl Instance {
                         Err(e) => return Err(Error::Pipe(e.kind())),
                         Ok(Some(line)) => match parser::parse(line) {
                             Ok(line) => return Ok(line),
-                            Err(e) => {debug!("{:?}", e); continue}
+                            Err(e) => return Err(Error::Unparsable(e))
                         }
                         Ok(None) => continue,
                     }
