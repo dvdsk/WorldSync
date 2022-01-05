@@ -69,52 +69,50 @@ async fn dir_empty(dir: &Path) -> Result<bool, Error> {
     }
 }
 
-#[derive(Copy, Clone)]
-enum Phase {
-    Running,
-    Done,
-}
-
-type Tomato = Result<Bytes, reqwest::Error>;
-struct Download<S: Stream<Item = Tomato>> {
-    phase: Phase,
+struct Download<S: Stream<Item = Result<Bytes, reqwest::Error>>> {
     decode_task: Option<JoinHandle<Result<(), Error>>>,
     stream: S,
     dir: PathBuf,
     tx: mpsc::UnboundedSender<Bytes>,
 }
 
-use futures::{stream, Stream};
-async fn test_stream(dir: PathBuf) -> impl Stream<Item = Result<(), Error>> {
-    let init = match init_download(&dir).await {
-        Ok((task, response, tx)) => Download {
-            phase: Phase::Running,
-            decode_task: Some(task),
-            stream: response.bytes_stream(),
-            dir,
-            tx,
-        },
-        Err(e) => todo!(),
-        // Err(e) => return stream::once(async { Err(e) }),
+async fn download(dir: PathBuf) -> Result<(), Error>{
+    use futures::stream::TryStreamExt;
+    let stream = test_stream(dir).await?;
+    // this is needed as try_next needs Pin<TryStream> an TryStream is 
+    // not implemented for Pin<TryStream> this is due to trait aliasses
+    // not yet being stable, and will not be a problem in the future.
+    // this line of code can be removed when trait aliasses are stabalized
+    let mut stream = stream.into_stream().boxed();
+    while let Some(_n) = stream.try_next().await? {
+        dbg!("progress!");
+    }
+
+    Ok(())
+}
+
+use futures::{stream, Stream, TryStream, StreamExt};
+async fn test_stream(dir: PathBuf) -> Result<impl TryStream<Ok = usize, Error = Error>, Error> {
+    let (task, response, tx) = init_download(&dir).await?;
+    let init = Download {
+        decode_task: Some(task),
+        stream: response.bytes_stream(),
+        dir,
+        tx,
     };
 
-    use Phase::*;
-    stream::unfold(init, |mut state| async move {
-        match state.phase {
-            Running => {
-                let res = state.advance().await;
-                match res {
-                    Ok(_) => Some((res, state)),
-                    Err(e) => {
-                        state.phase = Done;
-                        let e = cleanup(e, &state.dir).await;
-                        Some((Err(e), state))
-                    }
-                }
+    Ok(stream::try_unfold(init, |mut state| async move {
+        let res = state.advance().await;
+        let yielded = 1;
+        match res {
+            State::Downloading => Ok(Some((yielded, state))),
+            State::Done => Ok(None),
+            State::Error(e) => {
+                let e = cleanup(e, &state.dir).await;
+                return Err(e);
             }
-            Done => None,
         }
-    })
+    }))
 }
 
 async fn cleanup(org_err: Error, dir: &Path) -> Error {
@@ -127,26 +125,31 @@ async fn cleanup(org_err: Error, dir: &Path) -> Error {
     }
 }
 
-impl<S: Stream<Item = Tomato> + Unpin> Download<S> {
-    async fn advance(&mut self) -> Result<(), Error> {
-        use futures_util::StreamExt;
+enum State {
+    Downloading,
+    Done,
+    Error(Error),
+}
+
+impl<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin> Download<S> {
+    async fn advance(&mut self) -> State {
         use Error::*;
 
         let item = match self.stream.next().await {
             Some(item) => item,
-            None => return Ok(()),
+            None => return State::Done,
         };
 
         let bytes = match item {
             Ok(bytes) => bytes,
-            Err(e) => return Err(InvalidResponse(e)),
+            Err(e) => return State::Error(InvalidResponse(e)),
         };
 
         match self.tx.send(bytes) {
-            Ok(_) => Ok(()),
+            Ok(_) => State::Downloading,
             Err(_) => {
                 let unpack_err = self.decode_task.take().unwrap().await.unwrap().unwrap_err();
-                return Err(unpack_err);
+                return State::Error(unpack_err);
             }
         }
     }
@@ -229,7 +232,7 @@ mod tests {
         if !test_dir.is_dir() {
             fs::create_dir(test_dir).await.unwrap();
         }
-        download_java(test_dir.into()).await.unwrap();
+        download(test_dir.into()).await.unwrap();
         // fs::remove_dir_all(test_dir).await.unwrap();
     }
 }
