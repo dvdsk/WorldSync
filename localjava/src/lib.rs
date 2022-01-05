@@ -65,9 +65,9 @@ mod test {
         assert_eq!(res, Err(Error::NotDir));
     }
 
-    #[test]
-    fn download_fresh() {
+    // #[test]
+    // fn download_fresh() {
 
 
-    }
+    // }
 }
