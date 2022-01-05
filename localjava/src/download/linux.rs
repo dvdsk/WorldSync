@@ -1,7 +1,8 @@
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
-use tokio::sync::mpsc;
 use tokio::fs;
+use tokio::sync::mpsc;
+use tracing::trace;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -28,7 +29,7 @@ fn download_url() -> String {
     const ARCH: &str = "x64";
     const PACK: &str = "tar.gz";
     format!(
-        "https://download.oracle.com/java/17/latest/jdk-17_{}-{}.{}",
+        "https://download.oracle.com/java/17/latest/jdk-17_{}-{}_bin.{}",
         OS, ARCH, PACK
     )
 }
@@ -45,16 +46,19 @@ pub fn unpack(stream: impl Read, dir: &Path) -> Result<(), Error> {
 
 async fn cleanup(dir: &Path) -> Result<(), Error> {
     assert!(dir.is_dir());
-    fs::remove_dir_all(dir).await
+    fs::remove_dir_all(dir)
+        .await
         .map_err(|e| e.kind())
         .map_err(Error::Inaccessible)
 }
 
 async fn dir_empty(dir: &Path) -> Result<bool, Error> {
-    let content = fs::read_dir(dir).await
+    let content = fs::read_dir(dir)
+        .await
         .map_err(|e| e.kind())
         .map_err(Error::Inaccessible)?
-        .next_entry().await
+        .next_entry()
+        .await
         .map_err(|e| e.kind())
         .map_err(Error::Inaccessible)?;
     match content {
@@ -75,8 +79,11 @@ pub async fn download_java(dir: PathBuf) -> Result<(), Error> {
     }
 
     let url = download_url();
+    trace!("downloading: {}", url);
     let mut stream = reqwest::get(url)
         .await
+        .map_err(RequestFailed)?
+        .error_for_status()
         .map_err(RequestFailed)?
         .bytes_stream();
 
@@ -144,5 +151,21 @@ impl Read for ChannelRead {
             // a read from the exhausted cursor.
         }
         self.current.read(buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::fs;
+
+    #[tokio::test]
+    async fn test_download() {
+        let test_dir = Path::new("test_download");
+        if !test_dir.is_dir() {
+            fs::create_dir(test_dir).await.unwrap();
+        }
+        download_java(test_dir.into()).await.unwrap();
+        // fs::remove_dir_all(test_dir).await.unwrap();
     }
 }
