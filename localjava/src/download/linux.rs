@@ -1,7 +1,9 @@
 use bytes::Bytes;
+use reqwest::Response;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::trace;
 
 #[derive(Debug, thiserror::Error)]
@@ -44,7 +46,7 @@ pub fn unpack(stream: impl Read, dir: &Path) -> Result<(), Error> {
         .map_err(Error::Unpacking)
 }
 
-async fn cleanup(dir: &Path) -> Result<(), Error> {
+async fn do_cleanup(dir: &Path) -> Result<(), Error> {
     assert!(dir.is_dir());
     fs::remove_dir_all(dir)
         .await
@@ -67,9 +69,99 @@ async fn dir_empty(dir: &Path) -> Result<bool, Error> {
     }
 }
 
-#[tracing::instrument]
-pub async fn download_java(dir: PathBuf) -> Result<(), Error> {
-    use futures_util::StreamExt;
+#[derive(Copy, Clone)]
+enum Phase {
+    Running,
+    Done,
+}
+
+type Tomato = Result<Bytes, reqwest::Error>;
+struct Download<S: Stream<Item = Tomato>> {
+    phase: Phase,
+    decode_task: Option<JoinHandle<Result<(), Error>>>,
+    stream: S,
+    dir: PathBuf,
+    tx: mpsc::UnboundedSender<Bytes>,
+}
+
+use futures::{stream, Stream};
+async fn test_stream(dir: PathBuf) -> impl Stream<Item = Result<(), Error>> {
+    let init = match init_download(&dir).await {
+        Ok((task, response, tx)) => Download {
+            phase: Phase::Running,
+            decode_task: Some(task),
+            stream: response.bytes_stream(),
+            dir,
+            tx,
+        },
+        Err(e) => todo!(),
+        // Err(e) => return stream::once(async { Err(e) }),
+    };
+
+    use Phase::*;
+    stream::unfold(init, |mut state| async move {
+        match state.phase {
+            Running => {
+                let res = state.advance().await;
+                match res {
+                    Ok(_) => Some((res, state)),
+                    Err(e) => {
+                        state.phase = Done;
+                        let e = cleanup(e, &state.dir).await;
+                        Some((Err(e), state))
+                    }
+                }
+            }
+            Done => None,
+        }
+    })
+}
+
+async fn cleanup(org_err: Error, dir: &Path) -> Error {
+    match do_cleanup(&dir).await {
+        Ok(_) => org_err,
+        Err(e) => Error::CleanUp {
+            org: Box::new(org_err),
+            during_cleanup: Box::new(e),
+        },
+    }
+}
+
+impl<S: Stream<Item = Tomato> + Unpin> Download<S> {
+    async fn advance(&mut self) -> Result<(), Error> {
+        use futures_util::StreamExt;
+        use Error::*;
+
+        let item = match self.stream.next().await {
+            Some(item) => item,
+            None => return Ok(()),
+        };
+
+        let bytes = match item {
+            Ok(bytes) => bytes,
+            Err(e) => return Err(InvalidResponse(e)),
+        };
+
+        match self.tx.send(bytes) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                let unpack_err = self.decode_task.take().unwrap().await.unwrap().unwrap_err();
+                return Err(unpack_err);
+            }
+        }
+    }
+}
+
+async fn init_download(
+    dir: &PathBuf,
+) -> Result<
+    (
+        JoinHandle<Result<(), Error>>,
+        Response,
+        mpsc::UnboundedSender<Bytes>,
+    ),
+    Error,
+> {
     use Error::*;
 
     // only if dir is empty now can we safely remove all its contents
@@ -80,12 +172,11 @@ pub async fn download_java(dir: PathBuf) -> Result<(), Error> {
 
     let url = download_url();
     trace!("downloading: {}", url);
-    let mut stream = reqwest::get(url)
+    let response = reqwest::get(url)
         .await
         .map_err(RequestFailed)?
         .error_for_status()
-        .map_err(RequestFailed)?
-        .bytes_stream();
+        .map_err(RequestFailed)?;
 
     let dir_clone = dir.clone();
     let (tx, rx) = mpsc::unbounded_channel();
@@ -94,34 +185,7 @@ pub async fn download_java(dir: PathBuf) -> Result<(), Error> {
         unpack(stream, &dir_clone)
     });
 
-    let res = loop {
-        let item = match stream.next().await {
-            Some(item) => item,
-            None => break Ok(()),
-        };
-
-        let bytes = match item {
-            Ok(bytes) => bytes,
-            Err(e) => break Err(InvalidResponse(e)),
-        };
-
-        match tx.send(bytes) {
-            Ok(_) => (),
-            Err(_) => {
-                let unpack_err = task.await.unwrap().unwrap_err();
-                break Err(unpack_err);
-            }
-        }
-    };
-
-    if let Err(org_err) = res {
-        cleanup(&dir).await.map_err(|e| CleanUp {
-            org: Box::new(org_err),
-            during_cleanup: Box::new(e),
-        })?;
-    }
-
-    Ok(())
+    Ok((task, response, tx))
 }
 
 use std::io::{Cursor, Read};
