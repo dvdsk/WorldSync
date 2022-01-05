@@ -1,6 +1,6 @@
 #[cfg(target_os = "linux")]
 mod linux;
-#[cfg(target_os = "linux")]
+// #[cfg(target_os = "linux")]
 // use linux::download_java;
 
 
