@@ -1859,7 +1859,6 @@ dependencies = [
  "tokio",
  "tracing",
  "zip",
- "zip-extensions",
 ]
 
 [[package]]
@@ -4309,13 +4308,4 @@ dependencies = [
  "flate2",
  "thiserror",
  "time 0.1.43",
-]
-
-[[package]]
-name = "zip-extensions"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a64c3c977bc3434ce2d4bcea8ad3c644672de0f2c402b72b9171ca80a8885d14"
-dependencies = [
- "zip",
 ]

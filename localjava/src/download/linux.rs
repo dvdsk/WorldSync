@@ -23,50 +23,97 @@ pub enum Error {
     NotEmpty,
 }
 
-fn download_url() -> String {
+/// os either: linux, macos or windows
+/// pack tar.gz for linux and macos and zip for windows
+fn download_url(os: &str, pack: &str) -> String {
     //https://www.oracle.com/java/technologies/jdk-script-friendly-urls/
-    const OS: &str = "linux";
     const ARCH: &str = "x64";
-    const PACK: &str = "tar.gz";
     format!(
         "https://download.oracle.com/java/17/latest/jdk-17_{}-{}_bin.{}",
-        OS, ARCH, PACK
+        os, ARCH, pack
     )
+}
+
+use zip::result::ZipError;
+#[derive(Debug)]
+pub enum ArchiveErr {
+    Tar(std::io::Error),
+    Zip(ZipError),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum UnpackErr {
     #[error("Io error listing the files: {0:?}")]
-    ListEntries(std::io::Error),
+    ListEntries(ArchiveErr),
     #[error("Io error accessing a file listing: {0:?}")]
-    AccessEntry(std::io::Error),
+    AccessEntry(ArchiveErr),
     #[error("Io error while unpacking a file: {0:?}")]
-    Unpack(std::io::Error),
-    #[error("A path in the tar went out of the target dir")]
+    Unpack(ArchiveErr),
+    #[error("Io error while creating new file: {0:?}")]
+    Create(std::io::Error),
+    #[error("Io error while writing data to a file: {0:?}")]
+    Write(std::io::Error),
+    #[error("A path in the archive tried to escape the target dir")]
     PathLeft(Option<PathBuf>),
 }
 
-pub fn unpack(
-    stream: ChannelRead,
-    dir: &Path,
+pub fn unpack_tar_gz(
+    byte_rx: mpsc::UnboundedReceiver<Bytes>,
+    dir: PathBuf,
     progress: mpsc::UnboundedSender<u64>,
 ) -> Result<(), UnpackErr> {
     use flate2::read::GzDecoder;
+    use ArchiveErr::Tar;
     use UnpackErr::*;
 
+    let stream = ChannelRead::from(byte_rx);
     let read_observer = stream.get_observer();
     let tar = GzDecoder::new(stream);
     let mut ar = tar::Archive::new(tar);
 
-    for file in ar.entries().map_err(ListEntries)? {
-        let mut file = file.map_err(AccessEntry)?;
-        let contained_path = file.unpack_in(dir).map_err(Unpack)?;
+    for file in ar.entries().map_err(Tar).map_err(ListEntries)? {
+        let mut file = file.map_err(Tar).map_err(AccessEntry)?;
+        let contained_path = file.unpack_in(&dir).map_err(Tar).map_err(Unpack)?;
         if !contained_path {
             let path = file.path().ok().map(|cow| cow.into_owned());
             return Err(PathLeft(path));
         }
-        progress.send(read_observer.load(std::sync::atomic::Ordering::Relaxed)).unwrap();
+        progress
+            .send(read_observer.load(std::sync::atomic::Ordering::Relaxed))
+            .unwrap();
     }
+    Ok(())
+}
+
+pub fn unpack_zip(
+    mut stream: mpsc::UnboundedReceiver<Bytes>,
+    dir: PathBuf,
+    progress: mpsc::UnboundedSender<u64>,
+) -> Result<(), UnpackErr> {
+    use ArchiveErr::Zip;
+    use UnpackErr::*;
+
+    let mut buf = Vec::new();
+    while let Some(bytes) = stream.blocking_recv() {
+        buf.extend_from_slice(&bytes);
+    }
+    let reader = Cursor::new(buf);
+
+    let mut zip = zip::ZipArchive::new(reader)
+        .map_err(Zip)
+        .map_err(ListEntries)?;
+    for i in 0..zip.len() {
+        let mut zipped = zip.by_index(i).map_err(Zip).map_err(AccessEntry)?;
+        let unsafe_path = PathBuf::from(zipped.name());
+        let path = zipped
+            .enclosed_name()
+            .ok_or(UnpackErr::PathLeft(Some(unsafe_path)))?;
+        let path = dir.join(path);
+        let mut file = std::fs::File::create(path).map_err(Create)?;
+        std::io::copy(&mut zipped, &mut file).map_err(Write)?;
+        progress.send(zipped.compressed_size()).unwrap();
+    }
+
     Ok(())
 }
 
@@ -125,25 +172,43 @@ struct Download<S: Stream<Item = Result<Bytes, reqwest::Error>>> {
     tx: mpsc::UnboundedSender<Bytes>,
 }
 
-async fn download(dir: PathBuf) -> Result<(), Error> {
-    use futures::stream::TryStreamExt;
-    let stream = test_stream(dir).await?;
-    // this is needed as try_next needs Pin<TryStream> an TryStream is
-    // not implemented for Pin<TryStream> this is due to trait aliasses
-    // not yet being stable, and will not be a problem in the future.
-    // this line of code can be removed when trait aliasses are stabalized
-    let mut stream = stream.into_stream().boxed();
+
+use futures::stream::TryStreamExt;
+async fn download_targz(dir: PathBuf, url: String) -> Result<(), Error> {
+    let mut stream = unpack_stream(dir, url, unpack_tar_gz).await?;
     while let Some(progress) = stream.try_next().await? {
-        // print!("\rprogress: {}", progress);
-        println!("progress: {}", progress);
+        print!("\rprogress: {}", progress);
     }
 
     Ok(())
 }
 
+async fn download_zip(dir: PathBuf, url: String) -> Result<(), Error> {{
+    let mut stream = unpack_stream(dir, url, unpack_zip).await?;
+    while let Some(progress) = stream.try_next().await? {
+        print!("\rprogress: {}", progress);
+    }
+
+    Ok(())
+}
+}
+
 use futures::{stream, Stream, StreamExt, TryStream};
-async fn test_stream(dir: PathBuf) -> Result<impl TryStream<Ok = Progress, Error = Error>, Error> {
-    let (task, response, tx, rx) = init_download(&dir).await?;
+async fn unpack_stream<F>(
+    dir: PathBuf,
+    url: String,
+    unpack: F,
+) -> Result<impl TryStream<Ok = Progress, Error = Error>, Error>
+where
+    F: Fn(
+            mpsc::UnboundedReceiver<Bytes>,
+            PathBuf,
+            mpsc::UnboundedSender<u64>,
+        ) -> Result<(), UnpackErr>
+        + Send
+        + 'static,
+{
+    let (task, response, tx, rx) = init_download(&dir, url, unpack).await?;
     let init = Download {
         decode_task: Some(task),
         bytes_decoded: rx,
@@ -154,7 +219,13 @@ async fn test_stream(dir: PathBuf) -> Result<impl TryStream<Ok = Progress, Error
         tx,
     };
 
-    Ok(stream::try_unfold(init, state_machine))
+    let stream = stream::try_unfold(init, state_machine);
+    // this is needed as try_next needs Pin<TryStream> an TryStream is
+    // not implemented for Pin<TryStream> this is due to trait aliasses
+    // not yet being stable, and will not be a problem in the future.
+    // this line of code can be removed when trait aliasses are stabalized
+    // let mut stream = stream.into_stream().boxed();
+    Ok(stream.into_stream().boxed())
 }
 
 enum Phase {
@@ -191,9 +262,7 @@ impl<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin> Download<S> {
                 Ok(false)
             }
             None => {
-                dbg!();
-                self
-                    .decode_task
+                self.decode_task
                     .take()
                     .expect("should always have ownership over the task")
                     .await
@@ -217,7 +286,7 @@ impl<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin> Download<S> {
 
         let item = match stream_next {
             Some(item) => item,
-            None => return Ok(true)
+            None => return Ok(true),
         };
 
         let bytes = item.map_err(InvalidResponse)?;
@@ -239,8 +308,10 @@ impl<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin> Download<S> {
     }
 }
 
-async fn init_download(
+async fn init_download<F>(
     dir: &PathBuf,
+    url: String,
+    unpack: F,
 ) -> Result<
     (
         JoinHandle<Result<(), UnpackErr>>,
@@ -249,7 +320,16 @@ async fn init_download(
         mpsc::UnboundedReceiver<u64>,
     ),
     Error,
-> {
+>
+where
+    F: Fn(
+            mpsc::UnboundedReceiver<Bytes>,
+            PathBuf,
+            mpsc::UnboundedSender<u64>,
+        ) -> Result<(), UnpackErr>
+        + Send
+        + 'static,
+{
     use Error::*;
 
     // only if dir is empty now can we safely remove all its contents
@@ -258,7 +338,6 @@ async fn init_download(
         return Err(NotEmpty);
     }
 
-    let url = download_url();
     trace!("downloading: {}", url);
     let response = reqwest::get(url)
         .await
@@ -269,10 +348,7 @@ async fn init_download(
     let dir_clone = dir.clone();
     let (byte_tx, byte_rx) = mpsc::unbounded_channel();
     let (size_tx, size_rx) = mpsc::unbounded_channel();
-    let task = tokio::task::spawn_blocking(move || {
-        let stream = ChannelRead::from(byte_rx);
-        unpack(stream, &dir_clone, size_tx)
-    });
+    let task = tokio::task::spawn_blocking(move || unpack(byte_rx, dir_clone, size_tx));
 
     Ok((task, response, byte_tx, size_rx))
 }
@@ -310,9 +386,9 @@ impl Read for ChannelRead {
             // a read from the exhausted cursor.
         }
         let n = self.current.read(buf)?;
-        self.read.fetch_add(n as u64, std::sync::atomic::Ordering::Relaxed);
+        self.read
+            .fetch_add(n as u64, std::sync::atomic::Ordering::Relaxed);
         Ok(n)
-
     }
 }
 
@@ -322,12 +398,25 @@ mod tests {
     use tokio::fs;
 
     #[tokio::test]
-    async fn test_download() {
-        let test_dir = Path::new("test_download");
+    async fn test_download_linux() {
+        let test_dir = Path::new("test_download_linux");
         if !test_dir.is_dir() {
             fs::create_dir(test_dir).await.unwrap();
         }
-        download(test_dir.into()).await.unwrap();
-        // fs::remove_dir_all(test_dir).await.unwrap();
+
+        let url = download_url("linux", "tar.gz");
+        download_targz(test_dir.into(), url).await.unwrap();
+        fs::remove_dir_all(test_dir).await.unwrap();
+    }
+    #[tokio::test]
+    async fn test_download_windows() {
+        let test_dir = Path::new("test_download_windows");
+        if !test_dir.is_dir() {
+            fs::create_dir(test_dir).await.unwrap();
+        }
+
+        let url = download_url("windows", "zip");
+        download_targz(test_dir.into(), url).await.unwrap();
+        fs::remove_dir_all(test_dir).await.unwrap();
     }
 }
