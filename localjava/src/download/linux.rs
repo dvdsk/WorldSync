@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use reqwest::Response;
+use std::fmt;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::sync::mpsc;
@@ -12,13 +13,8 @@ pub enum Error {
     RequestFailed(reqwest::Error),
     #[error("Could not get bytes from oracle.com response")]
     InvalidResponse(reqwest::Error),
-    #[error("While cleaning up after error: {org} a second error occured: {during_cleanup}")]
-    CleanUp {
-        org: Box<Error>,
-        during_cleanup: Box<Error>,
-    },
     #[error("Ran into an io error during unpacking the local java install: {0:?}")]
-    Unpacking(std::io::ErrorKind),
+    Unpacking(UnpackErr),
     #[error("Directory could not be accessed, io error: {0:?}")]
     Inaccessible(std::io::ErrorKind),
     #[error("Directory needs to be empty to download java into it")]
@@ -36,22 +32,39 @@ fn download_url() -> String {
     )
 }
 
-pub fn unpack(stream: impl Read, dir: &Path) -> Result<(), Error> {
-    use flate2::read::GzDecoder;
-    let tar = GzDecoder::new(stream);
-    let mut archive = tar::Archive::new(tar);
-    archive
-        .unpack(dir)
-        .map_err(|e| e.kind())
-        .map_err(Error::Unpacking)
+#[derive(Debug, thiserror::Error)]
+pub enum UnpackErr {
+    #[error("Io error listing the files: {0:?}")]
+    ListEntries(std::io::Error),
+    #[error("Io error accessing a file listing: {0:?}")]
+    AccessEntry(std::io::Error),
+    #[error("Io error while unpacking a file: {0:?}")]
+    Unpack(std::io::Error),
+    #[error("A path in the tar went out of the target dir")]
+    PathLeft(Option<PathBuf>),
 }
 
-async fn do_cleanup(dir: &Path) -> Result<(), Error> {
-    assert!(dir.is_dir());
-    fs::remove_dir_all(dir)
-        .await
-        .map_err(|e| e.kind())
-        .map_err(Error::Inaccessible)
+pub fn unpack(
+    stream: impl Read,
+    dir: &Path,
+    progress: mpsc::UnboundedSender<u64>,
+) -> Result<(), UnpackErr> {
+    use flate2::read::GzDecoder;
+    use UnpackErr::*;
+
+    let tar = GzDecoder::new(stream);
+    let mut ar = tar::Archive::new(tar);
+
+    for file in ar.entries().map_err(ListEntries)? {
+        let mut file = file.map_err(AccessEntry)?;
+        let contained_path = file.unpack_in(dir).map_err(Unpack)?;
+        if !contained_path {
+            let path = file.path().ok().map(|cow| cow.into_owned());
+            return Err(PathLeft(path));
+        }
+        progress.send(file.size()).unwrap();
+    }
+    Ok(())
 }
 
 async fn dir_empty(dir: &Path) -> Result<bool, Error> {
@@ -69,87 +82,155 @@ async fn dir_empty(dir: &Path) -> Result<bool, Error> {
     }
 }
 
+#[derive(Clone)]
+pub struct Progress {
+    pub total: u64,
+    pub downloaded: u64,
+    pub decoded: u64,
+}
+
+impl fmt::Display for Progress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let unpacking = self.decoded as f32 / self.total as f32 * 100.0;
+        let downloading = self.downloaded as f32 / self.total as f32 * 100.0;
+
+        write!(
+            f,
+            "Downloading ({:.1}%) and Unpacking ({:.1}%)",
+            downloading, unpacking
+        )
+    }
+}
+
+impl Progress {
+    fn from(resp: &Response) -> Self {
+        Self {
+            total: resp.content_length().unwrap(),
+            decoded: 0,
+            downloaded: 0,
+        }
+    }
+}
+
 struct Download<S: Stream<Item = Result<Bytes, reqwest::Error>>> {
-    decode_task: Option<JoinHandle<Result<(), Error>>>,
+    decode_task: Option<JoinHandle<Result<(), UnpackErr>>>,
+    bytes_decoded: mpsc::UnboundedReceiver<u64>,
+    progress: Progress,
+    phase: Phase,
     stream: S,
     dir: PathBuf,
     tx: mpsc::UnboundedSender<Bytes>,
 }
 
-async fn download(dir: PathBuf) -> Result<(), Error>{
+async fn download(dir: PathBuf) -> Result<(), Error> {
     use futures::stream::TryStreamExt;
     let stream = test_stream(dir).await?;
-    // this is needed as try_next needs Pin<TryStream> an TryStream is 
+    // this is needed as try_next needs Pin<TryStream> an TryStream is
     // not implemented for Pin<TryStream> this is due to trait aliasses
     // not yet being stable, and will not be a problem in the future.
     // this line of code can be removed when trait aliasses are stabalized
     let mut stream = stream.into_stream().boxed();
-    while let Some(_n) = stream.try_next().await? {
-        dbg!("progress!");
+    while let Some(progress) = stream.try_next().await? {
+        // print!("\rprogress: {}", progress);
+        println!("progress: {}", progress);
     }
 
     Ok(())
 }
 
-use futures::{stream, Stream, TryStream, StreamExt};
-async fn test_stream(dir: PathBuf) -> Result<impl TryStream<Ok = usize, Error = Error>, Error> {
-    let (task, response, tx) = init_download(&dir).await?;
+use futures::{stream, Stream, StreamExt, TryStream};
+async fn test_stream(dir: PathBuf) -> Result<impl TryStream<Ok = Progress, Error = Error>, Error> {
+    let (task, response, tx, rx) = init_download(&dir).await?;
     let init = Download {
         decode_task: Some(task),
+        bytes_decoded: rx,
+        phase: Phase::Running,
+        progress: Progress::from(&response),
         stream: response.bytes_stream(),
         dir,
         tx,
     };
 
-    Ok(stream::try_unfold(init, |mut state| async move {
-        let res = state.advance().await;
-        let yielded = 1;
-        match res {
-            State::Downloading => Ok(Some((yielded, state))),
-            State::Done => Ok(None),
-            State::Error(e) => {
-                let e = cleanup(e, &state.dir).await;
-                return Err(e);
-            }
-        }
-    }))
+    Ok(stream::try_unfold(init, state_machine))
 }
 
-async fn cleanup(org_err: Error, dir: &Path) -> Error {
-    match do_cleanup(&dir).await {
-        Ok(_) => org_err,
-        Err(e) => Error::CleanUp {
-            org: Box::new(org_err),
-            during_cleanup: Box::new(e),
-        },
+enum Phase {
+    Running,
+    DlDone,
+}
+
+async fn state_machine<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin>(
+    mut state: Download<S>,
+) -> Result<Option<(Progress, Download<S>)>, Error> {
+    match state.phase {
+        Phase::Running => {
+            let done = state.download_and_unpack().await?;
+            if done {
+                state.phase = Phase::DlDone;
+            }
+            Ok(Some((state.progress.clone(), state)))
+        }
+        Phase::DlDone => {
+            let done = state.unpack().await?;
+            match done {
+                false => Ok(Some((state.progress.clone(), state))),
+                true => Ok(None),
+            }
+        }
     }
 }
 
-enum State {
-    Downloading,
-    Done,
-    Error(Error),
-}
-
 impl<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin> Download<S> {
-    async fn advance(&mut self) -> State {
+    async fn unpack(&mut self) -> Result<bool, Error> {
+        match self.bytes_decoded.recv().await {
+            Some(bytes) => {
+                self.progress.decoded += bytes;
+                Ok(false)
+            }
+            None => {
+                dbg!();
+                self
+                    .decode_task
+                    .take()
+                    .expect("should always have ownership over the task")
+                    .await
+                    .expect("io error occured joining with the task")
+                    .map_err(|e| Error::Unpacking(e))?;
+                Ok(true)
+            }
+        }
+    }
+
+    async fn download_and_unpack(&mut self) -> Result<bool, Error> {
         use Error::*;
 
-        let item = match self.stream.next().await {
+        let stream_next = tokio::select! {
+            item = self.stream.next() => item,
+            decoded = self.bytes_decoded.recv() => {
+                self.progress.decoded += decoded.unwrap();
+                return Ok(false)
+            }
+        };
+
+        let item = match stream_next {
             Some(item) => item,
-            None => return State::Done,
+            None => return Ok(true)
         };
 
-        let bytes = match item {
-            Ok(bytes) => bytes,
-            Err(e) => return State::Error(InvalidResponse(e)),
-        };
+        let bytes = item.map_err(InvalidResponse)?;
 
+        self.progress.downloaded += bytes.len() as u64;
         match self.tx.send(bytes) {
-            Ok(_) => State::Downloading,
+            Ok(_) => Ok(false),
             Err(_) => {
-                let unpack_err = self.decode_task.take().unwrap().await.unwrap().unwrap_err();
-                return State::Error(unpack_err);
+                let err = self
+                    .decode_task
+                    .take()
+                    .expect("should always have ownership over the task")
+                    .await
+                    .expect("io error occured joining with the task")
+                    .expect_err("task should return an error if sending failed");
+                return Err(Error::Unpacking(err));
             }
         }
     }
@@ -159,9 +240,10 @@ async fn init_download(
     dir: &PathBuf,
 ) -> Result<
     (
-        JoinHandle<Result<(), Error>>,
+        JoinHandle<Result<(), UnpackErr>>,
         Response,
         mpsc::UnboundedSender<Bytes>,
+        mpsc::UnboundedReceiver<u64>,
     ),
     Error,
 > {
@@ -182,13 +264,14 @@ async fn init_download(
         .map_err(RequestFailed)?;
 
     let dir_clone = dir.clone();
-    let (tx, rx) = mpsc::unbounded_channel();
+    let (byte_tx, byte_rx) = mpsc::unbounded_channel();
+    let (size_tx, size_rx) = mpsc::unbounded_channel();
     let task = tokio::task::spawn_blocking(move || {
-        let stream = ChannelRead::from(rx);
-        unpack(stream, &dir_clone)
+        let stream = ChannelRead::from(byte_rx);
+        unpack(stream, &dir_clone, size_tx)
     });
 
-    Ok((task, response, tx))
+    Ok((task, response, byte_tx, size_rx))
 }
 
 use std::io::{Cursor, Read};
