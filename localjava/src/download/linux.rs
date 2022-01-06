@@ -2,6 +2,8 @@ use bytes::Bytes;
 use reqwest::Response;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::sync::atomic::AtomicU64;
 use tokio::fs;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -45,13 +47,14 @@ pub enum UnpackErr {
 }
 
 pub fn unpack(
-    stream: impl Read,
+    stream: ChannelRead,
     dir: &Path,
     progress: mpsc::UnboundedSender<u64>,
 ) -> Result<(), UnpackErr> {
     use flate2::read::GzDecoder;
     use UnpackErr::*;
 
+    let read_observer = stream.get_observer();
     let tar = GzDecoder::new(stream);
     let mut ar = tar::Archive::new(tar);
 
@@ -62,7 +65,7 @@ pub fn unpack(
             let path = file.path().ok().map(|cow| cow.into_owned());
             return Err(PathLeft(path));
         }
-        progress.send(file.size()).unwrap();
+        progress.send(read_observer.load(std::sync::atomic::Ordering::Relaxed)).unwrap();
     }
     Ok(())
 }
@@ -184,7 +187,7 @@ impl<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin> Download<S> {
     async fn unpack(&mut self) -> Result<bool, Error> {
         match self.bytes_decoded.recv().await {
             Some(bytes) => {
-                self.progress.decoded += bytes;
+                self.progress.decoded = bytes;
                 Ok(false)
             }
             None => {
@@ -207,7 +210,7 @@ impl<S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin> Download<S> {
         let stream_next = tokio::select! {
             item = self.stream.next() => item,
             decoded = self.bytes_decoded.recv() => {
-                self.progress.decoded += decoded.unwrap();
+                self.progress.decoded = decoded.unwrap();
                 return Ok(false)
             }
         };
@@ -276,9 +279,10 @@ async fn init_download(
 
 use std::io::{Cursor, Read};
 // Wrap a channel into something that impls `io::Read`
-struct ChannelRead {
+pub struct ChannelRead {
     rx: mpsc::UnboundedReceiver<Bytes>,
     current: Cursor<Vec<u8>>,
+    read: Rc<AtomicU64>,
 }
 
 impl ChannelRead {
@@ -286,7 +290,12 @@ impl ChannelRead {
         ChannelRead {
             rx,
             current: Cursor::new(Vec::new()),
+            read: Rc::new(Default::default()),
         }
+    }
+
+    pub fn get_observer(&self) -> Rc<AtomicU64> {
+        self.read.clone()
     }
 }
 
@@ -300,7 +309,10 @@ impl Read for ChannelRead {
             // the channel, which means EOF. Propagate EOF by allowing
             // a read from the exhausted cursor.
         }
-        self.current.read(buf)
+        let n = self.current.read(buf)?;
+        self.read.fetch_add(n as u64, std::sync::atomic::Ordering::Relaxed);
+        Ok(n)
+
     }
 }
 
