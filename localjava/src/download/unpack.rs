@@ -73,6 +73,8 @@ pub fn unpack_zip(
     let mut zip = zip::ZipArchive::new(reader)
         .map_err(Zip)
         .map_err(ListEntries)?;
+
+    let mut unzipped = 0;
     for i in 0..zip.len() {
         let mut zipped = zip.by_index(i).map_err(Zip).map_err(AccessEntry)?;
         let unsafe_path = PathBuf::from(zipped.name());
@@ -80,9 +82,15 @@ pub fn unpack_zip(
             .enclosed_name()
             .ok_or(Error::PathLeft(Some(unsafe_path)))?;
         let path = dir.join(path);
+        if zipped.is_dir() {
+            std::fs::create_dir(path).map_err(Create)?;
+            continue;
+        }
+
         let mut file = std::fs::File::create(path).map_err(Create)?;
         std::io::copy(&mut zipped, &mut file).map_err(Write)?;
-        progress.send(zipped.compressed_size()).unwrap();
+        unzipped += zipped.compressed_size();
+        progress.send(unzipped).unwrap();
     }
 
     Ok(())

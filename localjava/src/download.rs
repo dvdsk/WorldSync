@@ -5,7 +5,6 @@ use std::fmt;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tracing::trace;
 
 mod stream;
 mod unpack;
@@ -61,8 +60,9 @@ struct Download<S: Stream<Item = Result<Bytes, reqwest::Error>>> {
     progress: Progress,
     phase: stream::Phase,
     stream: S,
-    dir: PathBuf,
-    tx: mpsc::UnboundedSender<Bytes>,
+    // option so we can drop it when the download is done
+    // signaling to the reader we are done
+    byte_tx: Option<mpsc::UnboundedSender<Bytes>>,
 }
 
 async fn download_targz(dir: PathBuf, url: String) -> Result<(), Error> {
@@ -70,64 +70,15 @@ async fn download_targz(dir: PathBuf, url: String) -> Result<(), Error> {
     while let Some(progress) = stream.try_next().await? {
         print!("\rprogress: {}", progress);
     }
-
     Ok(())
 }
 
 async fn download_zip(dir: PathBuf, url: String) -> Result<(), Error> {
-    {
-        let mut stream = stream::unpack_stream(dir, url, unpack::unpack_zip).await?;
-        while let Some(progress) = stream.try_next().await? {
-            print!("\rprogress: {}", progress);
-        }
-
-        Ok(())
+    let mut stream = stream::unpack_stream(dir, url, unpack::unpack_zip).await?;
+    while let Some(progress) = stream.try_next().await? {
+        print!("\rprogress: {}", progress);
     }
-}
-
-async fn init_download<F>(
-    dir: &PathBuf,
-    url: String,
-    unpack: F,
-) -> Result<
-    (
-        JoinHandle<Result<(), unpack::Error>>,
-        Response,
-        mpsc::UnboundedSender<Bytes>,
-        mpsc::UnboundedReceiver<u64>,
-    ),
-    Error,
->
-where
-    F: Fn(
-            mpsc::UnboundedReceiver<Bytes>,
-            PathBuf,
-            mpsc::UnboundedSender<u64>,
-        ) -> Result<(), unpack::Error>
-        + Send
-        + 'static,
-{
-    use Error::*;
-
-    // only if dir is empty now can we safely remove all its contents
-    // in case of error
-    if !util::dir_empty(&dir).await? {
-        return Err(NotEmpty);
-    }
-
-    trace!("downloading: {}", url);
-    let response = reqwest::get(url)
-        .await
-        .map_err(RequestFailed)?
-        .error_for_status()
-        .map_err(RequestFailed)?;
-
-    let dir_clone = dir.clone();
-    let (byte_tx, byte_rx) = mpsc::unbounded_channel();
-    let (size_tx, size_rx) = mpsc::unbounded_channel();
-    let task = tokio::task::spawn_blocking(move || unpack(byte_rx, dir_clone, size_tx));
-
-    Ok((task, response, byte_tx, size_rx))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -138,7 +89,7 @@ mod tests {
     use tokio::fs;
 
     #[tokio::test]
-    async fn test_download_linux() {
+    async fn download_linux() {
         let test_dir = Path::new("test_download_linux");
         if !test_dir.is_dir() {
             fs::create_dir(test_dir).await.unwrap();
@@ -149,14 +100,32 @@ mod tests {
         fs::remove_dir_all(test_dir).await.unwrap();
     }
     #[tokio::test]
-    async fn test_download_windows() {
+    async fn download_windows() {
         let test_dir = Path::new("test_download_windows");
         if !test_dir.is_dir() {
             fs::create_dir(test_dir).await.unwrap();
         }
 
         let url = util::download_url("windows", "zip");
-        download_targz(test_dir.into(), url).await.unwrap();
+        download_zip(test_dir.into(), url).await.unwrap();
+        fs::remove_dir_all(test_dir).await.unwrap();
+    }
+    #[tokio::test]
+    async fn fail_to_unpack() {
+        let test_dir = Path::new("test_fail_to_unpack");
+        if !test_dir.is_dir() {
+            fs::create_dir(test_dir).await.unwrap();
+        }
+
+        let url = util::download_url("windows", "zip");
+        let res = download_targz(test_dir.into(), url).await;
+        use Error::Unpacking;
+        use unpack::Error::AccessEntry;
+        use unpack::ArchiveErr::Tar;
+        match res {
+            Err(Unpacking(AccessEntry(Tar(_)))) => (),
+            _ => panic!("should error trying to open a zip as tar"),
+        }
         fs::remove_dir_all(test_dir).await.unwrap();
     }
 }
