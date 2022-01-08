@@ -27,13 +27,11 @@ where
     }
 
     trace!("downloading: {}", url);
-    dbg!(&url);
     let response = reqwest::get(url)
         .await
         .map_err(Error::RequestFailed)?
         .error_for_status()
         .map_err(Error::RequestFailed)?;
-    trace!("response: {:?}", response);
 
     let dir_clone = dir.clone();
     let (byte_tx, byte_rx) = mpsc::unbounded_channel();

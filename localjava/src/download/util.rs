@@ -46,7 +46,7 @@ impl Read for ChannelRead {
 
 /// os either: linux, macos or windows
 /// pack tar.gz for linux and macos and zip for windows
-pub fn download_url(os: &str, pack: &str) -> String {
+pub fn build_url(os: &str, pack: &str) -> String {
     //https://www.oracle.com/java/technologies/jdk-script-friendly-urls/
     const ARCH: &str = "x64";
     format!(

@@ -10,6 +10,10 @@ mod stream;
 mod unpack;
 mod util;
 
+pub use unpack::{unpack_zip, unpack_tar_gz};
+pub use util::build_url;
+pub use stream::unpack_stream;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Could not request latest java version from oracle.com")]
@@ -95,7 +99,7 @@ mod tests {
             fs::create_dir(test_dir).await.unwrap();
         }
 
-        let url = util::download_url("linux", "tar.gz");
+        let url = util::build_url("linux", "tar.gz");
         download_targz(test_dir.into(), url).await.unwrap();
         fs::remove_dir_all(test_dir).await.unwrap();
     }
@@ -106,7 +110,7 @@ mod tests {
             fs::create_dir(test_dir).await.unwrap();
         }
 
-        let url = util::download_url("windows", "zip");
+        let url = util::build_url("windows", "zip");
         download_zip(test_dir.into(), url).await.unwrap();
         fs::remove_dir_all(test_dir).await.unwrap();
     }
@@ -117,7 +121,7 @@ mod tests {
             fs::create_dir(test_dir).await.unwrap();
         }
 
-        let url = util::download_url("windows", "zip");
+        let url = util::build_url("windows", "zip");
         let res = download_targz(test_dir.into(), url).await;
         use Error::Unpacking;
         use unpack::Error::AccessEntry;
