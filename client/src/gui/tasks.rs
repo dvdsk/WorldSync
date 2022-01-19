@@ -84,7 +84,7 @@ impl State {
             NewHost(host) => match self.can_host().is_us(&host) {
                 true => {
                     info!("attempting to host");
-                    self.downloading_world.start();
+                    self.can_host().start_hosting();
                 }
                 false => {
                     info!("got new host: {:?}", host);

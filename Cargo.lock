@@ -310,6 +310,7 @@ dependencies = [
  "iced",
  "iced_futures",
  "iced_native",
+ "localjava",
  "protocol",
  "serde",
  "server",

@@ -1,8 +1,7 @@
 use bytes::Bytes;
-use futures::stream::{Stream, TryStreamExt};
+use futures::stream::Stream;
 use reqwest::Response;
 use std::fmt;
-use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
@@ -10,9 +9,9 @@ mod stream;
 mod unpack;
 mod util;
 
-pub use unpack::{unpack_zip, unpack_tar_gz};
-pub use util::build_url;
 pub use stream::unpack_stream;
+pub use unpack::{unpack_tar_gz, unpack_zip};
+pub use util::build_url;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -69,28 +68,28 @@ struct Download<S: Stream<Item = Result<Bytes, reqwest::Error>>> {
     byte_tx: Option<mpsc::UnboundedSender<Bytes>>,
 }
 
-async fn download_targz(dir: PathBuf, url: String) -> Result<(), Error> {
-    let mut stream = stream::unpack_stream(dir, url, unpack::unpack_tar_gz).await?;
-    while let Some(progress) = stream.try_next().await? {
-        print!("\rprogress: {}", progress);
-    }
-    Ok(())
-}
-
-async fn download_zip(dir: PathBuf, url: String) -> Result<(), Error> {
-    let mut stream = stream::unpack_stream(dir, url, unpack::unpack_zip).await?;
-    while let Some(progress) = stream.try_next().await? {
-        print!("\rprogress: {}", progress);
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use super::*;
     use tokio::fs;
+
+    async fn download_targz(dir: PathBuf, url: String) -> Result<(), Error> {
+        let mut stream = stream::unpack_stream(dir, url, unpack::unpack_tar_gz).await?;
+        while let Some(progress) = stream.try_next().await? {
+            print!("\rprogress: {}", progress);
+        }
+        Ok(())
+    }
+
+    async fn download_zip(dir: PathBuf, url: String) -> Result<(), Error> {
+        let mut stream = stream::unpack_stream(dir, url, unpack::unpack_zip).await?;
+        while let Some(progress) = stream.try_next().await? {
+            print!("\rprogress: {}", progress);
+        }
+        Ok(())
+    }
 
     #[tokio::test]
     async fn download_linux() {
@@ -123,9 +122,9 @@ mod tests {
 
         let url = util::build_url("windows", "zip");
         let res = download_targz(test_dir.into(), url).await;
-        use Error::Unpacking;
-        use unpack::Error::AccessEntry;
         use unpack::ArchiveErr::Tar;
+        use unpack::Error::AccessEntry;
+        use Error::Unpacking;
         match res {
             Err(Unpacking(AccessEntry(Tar(_)))) => (),
             _ => panic!("should error trying to open a zip as tar"),

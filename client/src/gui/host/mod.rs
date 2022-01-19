@@ -1,23 +1,28 @@
 use std::hash::Hash;
 
 use crate::gui::parts::ClearError;
+use crate::mc;
 pub use crate::Event as Msg;
-use crate::{world_dl, mc};
+use iced::{
+    button, Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text,
+};
 use protocol::HostId;
-use iced::{Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text, button};
 use shared::tarpc::client::RpcError;
 
-use super::RpcConn;
 use super::parts::{ErrorBar, Loading};
+use super::tasks::SubStatus;
+use super::{RpcConn, SubsList};
 
 mod tasks;
+use crate::java_setup;
+use crate::world_download;
 
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Error {
     #[error("Lost connection to worldsync server: {0:?}")]
     NoMetaConn(#[from] RpcError),
     #[error("Error downloading world: {0}")]
-    Sync(#[from] world_dl::Error),
+    Sync(#[from] world_download::Error),
     #[error("Could not start minecraft server: {0}")]
     ServerStart(#[from] wrapper::Error),
 }
@@ -33,11 +38,11 @@ pub enum Event {
     Error(Error),
     ClearError(Error),
     WantToHost,
-    ObjToSync{left: usize},
-    DlStarting{num_obj: usize},
+    ObjToSync { left: usize },
+    DlStarting { num_obj: usize },
     Loading(u8),
     WorldUpdated,
-    Mc(Result<wrapper::parser::Line,wrapper::Error>),
+    Mc(Result<wrapper::parser::Line, wrapper::Error>),
 }
 
 impl ClearError for Event {
@@ -50,7 +55,10 @@ impl ClearError for Event {
 pub struct Page {
     errorbar: ErrorBar<Error>,
     host: button::State,
-    downloading: Loading,
+    java_progress: Loading,
+    java_setup: SubStatus,
+    download_progress: Loading,
+    download: SubStatus,
     loading_server: Loading,
     rpc: RpcConn,
     pub host_id: Option<HostId>,
@@ -61,11 +69,13 @@ impl Page {
         Self {
             errorbar: Default::default(),
             host: Default::default(),
-            downloading: Default::default(),
+            java_progress: Default::default(),
+            java_setup: Default::default(),
+            download_progress: Default::default(),
+            download: Default::default(),
             loading_server: Default::default(),
             rpc,
             host_id: None,
-
         }
     }
 
@@ -74,19 +84,30 @@ impl Page {
             Event::Error(e) => self.errorbar.add(e),
             Event::ClearError(e) => self.errorbar.clear(e),
             Event::WantToHost => return self.request_to_host(),
-            Event::ObjToSync{left} => self.downloading.set_progress(left as f32),
-            Event::DlStarting{num_obj} => self.downloading.start(num_obj as f32, 0.0),
+            Event::ObjToSync { left } => self.download_progress.set_progress(left as f32),
+            Event::DlStarting { num_obj } => self.download_progress.start(num_obj as f32, 0.0),
             Event::WorldUpdated => {
-                self.downloading.finished();
+                self.download_progress.finished();
+                todo!("if java setup done");
                 self.loading_server.start(100.0, 0.0);
             }
             Event::Loading(p) => self.loading_server.set_progress(p as f32),
             Event::Mc(event) => match event {
                 Ok(line) => return mc::send_line(line, self.rpc.clone(), self.host_id.unwrap()),
                 Err(e) => self.errorbar.add(e.into()),
-            }
+            },
         }
         Command::none()
+    }
+
+    pub fn add_subs(&self, subs: &mut SubsList) {
+        if let Some(id) = self.java_setup.active() {
+            subs.push(java_setup::sub(id))
+        }
+        if let Some(id) = self.download.active() {
+            let host_id = self.host_id;
+            subs.push(world_download::sub(self.rpc.clone(), id))
+        }
     }
 
     pub fn view(&mut self) -> Element<Msg> {
@@ -100,7 +121,8 @@ impl Page {
             .push(top_spacer)
             .push(title())
             .push(host_button(&mut self.host))
-            .push(self.downloading.view())
+            .push(self.java_progress.view())
+            .push(self.download_progress.view())
             .push(self.loading_server.view())
             .push(bottom_spacer);
 
@@ -125,6 +147,9 @@ fn title() -> Text {
 }
 
 fn host_button(state: &mut button::State) -> Button<Msg> {
-    Button::new(state, Text::new("Host").horizontal_alignment(HorizontalAlignment::Center))
-        .on_press(Msg::HostPage(Event::WantToHost))
+    Button::new(
+        state,
+        Text::new("Host").horizontal_alignment(HorizontalAlignment::Center),
+    )
+    .on_press(Msg::HostPage(Event::WantToHost))
 }

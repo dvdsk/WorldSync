@@ -29,6 +29,11 @@ impl Page {
         })
     }
 
+    pub fn start_hosting(&mut self) {
+        self.java_setup.start();
+        self.download.start();
+    }
+
     pub fn is_us(&self, host: &protocol::HostDetails) -> bool {
         self.host_id == Some(host.id)
     }

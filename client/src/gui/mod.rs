@@ -1,4 +1,4 @@
-use crate::{events, mc, world_dl, Event};
+use crate::{events, mc, Event};
 use derivative::Derivative;
 use iced::{executor, Application, Clipboard, Command, Element, Subscription};
 use protocol::{HostState, ServiceClient, Uuid};
@@ -31,7 +31,6 @@ pub struct State {
 
     rpc: Option<RpcConn>,
     server_events: bool,
-    downloading_world: SubStatus,
     mc_server: SubStatus,
 }
 
@@ -47,7 +46,6 @@ impl State {
 
             rpc: None,
             server_events: false,
-            downloading_world: SubStatus::default(),
             mc_server: SubStatus::default(),
         }
     }
@@ -123,9 +121,7 @@ impl Application for State {
             ClipHost => clipboard.write(self.can_join.as_ref().unwrap().host.addr.to_string()),
             WorldUpdated => {
                 self.mc_server.start();
-                return self
-                    .can_host()
-                    .update(host::Event::WorldUpdated);
+                return self.can_host().update(host::Event::WorldUpdated);
             }
             McHandle(handle) => {
                 self.hosting = Some(hosting::Page::from(
@@ -135,11 +131,7 @@ impl Application for State {
                 ))
             }
             Mc(event) => match self.page {
-                Page::Host => {
-                    return self
-                        .can_host()
-                        .update(host::Event::Mc(event))
-                }
+                Page::Host => return self.can_host().update(host::Event::Mc(event)),
                 Page::Hosting => {
                     return self
                         .hosting
@@ -175,14 +167,15 @@ impl Application for State {
             hosting.add_subs(&mut subs);
         }
 
+        if let Some(host) = &self.can_host {
+            host.add_subs(&mut subs);
+        }
+
         if self.server_events {
             let rpc = self.unwrap_rpc().clone();
             subs.push(events::sub_to_server(rpc))
         }
-        if let Some(id) = self.downloading_world.active() {
-            let rpc = self.unwrap_rpc().clone();
-            subs.push(world_dl::sub(rpc, id))
-        }
+
         if let Some(_id) = self.mc_server.active() {
             subs.push(mc::sub())
         }

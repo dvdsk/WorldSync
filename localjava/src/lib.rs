@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-mod download;
+pub mod download;
+pub use download::Progress;
 
 #[derive(Debug, PartialEq)]
 pub struct Version(semver::Version);
@@ -57,7 +58,6 @@ fn java_bin(dir: &Path) -> PathBuf {
 }
 
 use download::Error as DlError;
-use download::Progress;
 use futures::TryStream;
 #[cfg(target_os = "linux")]
 pub async fn download_stream(
