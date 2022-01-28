@@ -12,7 +12,7 @@ use walkdir::WalkDir;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Object {
     pub org_path: PathBuf,
-    hash: u64,
+    pub hash: u64,
     pub id: ObjectId,
     pub size: u64,
 }
@@ -26,9 +26,13 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Save(Vec<Object>);
+pub struct SnapShot(Vec<Object>);
 
-impl Save {
+impl SnapShot {
+    pub fn append(&mut self, other: Self) {
+        self.0.extend(other.into_iter())
+    }
+
     pub fn size(&self) -> u64 {
         self.0.iter().map(|obj| obj.size).sum()
     }
@@ -105,7 +109,7 @@ impl UpdateList {
 
     /// return the Save and determine the objects we need to add to be able
     /// to load the save later
-    pub fn for_new_save(store: &impl ObjectStore, remote: DirContent) -> (Save, UpdateList) {
+    pub fn for_new_save(store: &impl ObjectStore, remote: DirContent) -> (SnapShot, UpdateList) {
         let mut new_objects = Vec::new();
         let mut new_save = Vec::new();
         for file in remote.0 {
@@ -126,7 +130,7 @@ impl UpdateList {
                 size: file.size,
             })
         }
-        (Save(new_save), UpdateList(new_objects))
+        (SnapShot(new_save), UpdateList(new_objects))
     }
 }
 
@@ -243,12 +247,12 @@ pub trait PathCheck {
 /// replace any path in self that is not on the allowed list with one
 /// of a known safe Save or remove the path if it is not in a previous
 /// Save or on the allowed list.
-pub fn secure_new_save(
-    unchecked: (Save, UpdateList),
-    safe: Save,
+pub fn secure_snapshot(
+    unchecked: (SnapShot, UpdateList),
+    reference: SnapShot,
     check: impl PathCheck, //HashSet<&Path>,
-) -> (Save, UpdateList) {
-    let mut safe_obj: HashMap<PathBuf, Object> = safe
+) -> (SnapShot, UpdateList) {
+    let mut safe_obj: HashMap<PathBuf, Object> = reference
         .into_iter()
         .map(|o| (o.org_path.clone(), o))
         .collect();
@@ -266,5 +270,5 @@ pub fn secure_new_save(
         .filter(|(_, path)| check.is_safe(path))
         .collect();
 
-    (Save(checked_save), UpdateList(checked_list))
+    (SnapShot(checked_save), UpdateList(checked_list))
 }

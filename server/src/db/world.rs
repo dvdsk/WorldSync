@@ -2,7 +2,8 @@ use core::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, Save, StoreKey, UpdateList};
+use protocol::Platform;
+use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, SnapShot, StoreKey, UpdateList};
 use tokio::fs;
 use tracing::instrument;
 use typed_sled::{sled, Tree};
@@ -41,6 +42,8 @@ impl fmt::Debug for WorldDb {
 }
 
 use async_trait::async_trait;
+
+use crate::world::Save;
 #[async_trait]
 impl ObjectStore for WorldDb {
     type Error = Error;
@@ -119,12 +122,12 @@ impl WorldDb {
         self.store_obj(id, path, bytes).await
     }
 
-    pub fn get_update_list(&self, dir: DirContent) -> DirUpdate {
-        self.last_save().needed_update(dir)
+    pub fn get_update_list(&self, dir: DirContent, platform: Platform) -> DirUpdate {
+        self.last_save().needed_update(dir, platform)
     }
 
-    pub fn secure_save(&self, unchecked: (Save, UpdateList)) -> (Save, UpdateList) {
-        sync::secure_new_save(unchecked, self.last_save(), McPaths)
+    pub fn secure_snapshot(&self, unchecked: (SnapShot, UpdateList)) -> (SnapShot, UpdateList) {
+        sync::secure_snapshot(unchecked, self.last_save().data, McPaths)
     }
 }
 

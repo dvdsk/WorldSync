@@ -7,7 +7,6 @@ members = [
 	"wrapper",
 	"client",
 	"server",
-	"localjava",
 ]
 
 # [profile.deployed]

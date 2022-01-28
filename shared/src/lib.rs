@@ -88,3 +88,13 @@ pub fn setup_test_tracing() {
         .with(filter_modules)
         .try_init();
 }
+
+pub async fn dir_empty(target: &Path) -> bool {
+    tokio::fs::read_dir(&target)
+        .await
+        .expect("could not check save dump content")
+        .next_entry()
+        .await
+        .unwrap()
+        .is_none()
+}

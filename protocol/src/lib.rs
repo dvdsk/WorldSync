@@ -131,6 +131,24 @@ impl User {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash, Eq)]
+pub enum Platform {
+    Windows,
+    Linux,
+}
+
+impl Platform {
+    pub fn current() -> Result<Self, ()> {
+        if cfg!(target_os = "linux") {
+            Ok(Self::Linux)
+        } else if cfg!(target_os = "windows") {
+            Ok(Self::Windows)
+        } else {
+            Err(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub struct Version {
     semver: String,
     commit: String,
@@ -182,12 +200,9 @@ pub trait Service {
     async fn await_event(id: SessionId) -> Result<Event, Error>;
     async fn host(id: SessionId) -> Result<HostState, Error>;
     async fn request_to_host(id: SessionId, host_id: HostId) -> Result<(), Error>;
-    async fn dir_update(id: SessionId, dir: DirContent) -> Result<DirUpdate, Error>;
-    async fn new_save(
-        id: SessionId,
-        host_id: HostId,
-        dir: DirContent,
-    ) -> Result<UpdateList, Error>;
+    async fn dir_update(id: SessionId, dir: DirContent, platform: Platform) -> Result<DirUpdate, Error>;
+    async fn new_save(id: SessionId, host_id: HostId, dir: DirContent)
+        -> Result<UpdateList, Error>;
     async fn register_save(id: SessionId, host_id: HostId) -> Result<(), Error>;
     async fn get_object(id: SessionId, object: ObjectId) -> Result<Vec<u8>, Error>;
     async fn put_object(
@@ -204,6 +219,7 @@ pub trait Service {
     async fn override_account(id: UserId, old: User, new: User) -> Result<(), Error>;
     async fn override_password(id: UserId, new: String) -> Result<(), Error>;
     async fn remove_account(id: UserId) -> Result<(), Error>;
+    async fn dump_server(dir: PathBuf, platform: Platform) -> Result<(), Error>;
     async fn dump_save(dir: PathBuf) -> Result<(), Error>;
     async fn set_save(dir: PathBuf) -> Result<(), Error>;
 }

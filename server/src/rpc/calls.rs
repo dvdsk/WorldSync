@@ -6,7 +6,7 @@ use sync::{DirContent, DirUpdate, ObjectId,UpdateList};
 use wrapper::parser::Line;
 
 use super::ConnState;
-use protocol::{Error, Event, AWAIT_EVENT_TIMEOUT};
+use protocol::{Error, Event, AWAIT_EVENT_TIMEOUT, Platform};
 use protocol::{HostDetails, HostId, HostState, Service, SessionId, User, UserId};
 use shared::tarpc;
 use tarpc::context;
@@ -139,9 +139,11 @@ impl Service for ConnState {
         _: context::Context,
         id: SessionId,
         dir: DirContent,
+        platform: Platform,
     ) -> Result<DirUpdate, Error> {
         let _ = self.get_user_id(id).ok_or(Error::SessionExpired)?;
-        Ok(self.world.get_update(dir))
+        let world = self.world.get_update(dir, platform);
+        Ok(world)
     }
     #[instrument(err, skip(self, dir))]
     async fn new_save(
@@ -275,6 +277,21 @@ impl Service for ConnState {
         Ok(())
     }
 
+    async fn dump_server(self, _: context::Context, dir: PathBuf, platform: Platform) -> Result<(), Error> {
+        if !self.peer_addr().is_loopback() {
+            return Err(Error::Unauthorized);
+        }
+
+        if !dir.exists() {
+            return Err(Error::DirDoesNotExist);
+        }
+
+        self.world.dump_server(&dir, platform).await?;
+        info!("dumped server into: {:?}", dir);
+        Ok(())
+
+    }
+
     async fn dump_save(self, _: context::Context, dir: PathBuf) -> Result<(), Error> {
         if !self.peer_addr().is_loopback() {
             return Err(Error::Unauthorized);
@@ -284,7 +301,7 @@ impl Service for ConnState {
             return Err(Error::DirDoesNotExist);
         }
 
-        self.world.dump_save(dir.clone()).await?;
+        self.world.dump_save(&dir).await?;
         info!("dumped last save into: {:?}", dir);
         Ok(())
     }

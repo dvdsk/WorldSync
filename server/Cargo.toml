@@ -30,6 +30,9 @@ shared = { path = "../shared" }
 sync = { path = "../sync" }
 wrapper = { path = "../wrapper" }
 
+[dev-dependencies]
+walkdir = "2"
+
 [features]
 default = ["util"]
 testing = []

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::gui::host::Event as hEvent;
 use futures::stream::{self, BoxStream};
+use protocol::Platform;
 use shared::tarpc::client::RpcError;
 use shared::tarpc::context;
 use sync::{DirContent, DirUpdate, ObjectId, SyncAction};
@@ -12,7 +13,7 @@ use tokio::io::AsyncWriteExt;
 use tracing::{debug, error, info, instrument};
 
 use crate::gui::RpcConn;
-use crate::{Event, server_path};
+use crate::{server_path, Event};
 
 pub fn sub(conn: RpcConn, count: usize) -> iced::Subscription<Event> {
     iced::Subscription::from_recipe(WorldDl {
@@ -101,11 +102,12 @@ impl State {
             fs::create_dir(server_path()).await.unwrap();
         }
         let dir_content = DirContent::from_dir(server_path().into()).await?;
+        let platform = Platform::curren();
         debug!("{:?}", dir_content);
         let dir_update = self
             .conn
             .client
-            .dir_update(context::current(), self.conn.session, dir_content)
+            .dir_update(context::current(), self.conn.session, dir_content, platform)
             .await??;
         debug!("{:?}", dir_update);
         Ok(dir_update)
@@ -192,7 +194,7 @@ async fn apply_action(conn: &mut RpcConn, action: SyncAction) -> Result<(), Erro
         }
         SyncAction::Add(path, id) => {
             let bytes = download_obj(conn, id).await?;
-            if let Some(dir) = local_path(&path).parent(){
+            if let Some(dir) = local_path(&path).parent() {
                 fs::create_dir_all(dir).await?;
             }
             if local_path(&path).is_dir() {
