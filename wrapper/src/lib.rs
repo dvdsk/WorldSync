@@ -86,7 +86,11 @@ impl Instance {
             .map_err(|_| Error::IncorrectServerPath)?;
         Self::assert_eula_accepted(server_path).await?;
 
-        let mut child = Command::new("java")
+        #[cfg(not(target_os = "windows"))]
+        let java = server_path.join("java/bin/java");
+        #[cfg(target_os = "windows")]
+        let java = server_path.join("java/bin/java.exe");
+        let mut child = Command::new(java)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::piped())
