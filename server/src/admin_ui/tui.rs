@@ -1,10 +1,10 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use shared::tarpc::context::Context;
+use protocol::{Platform, User, UserId};
 use shared::tarpc;
+use shared::tarpc::context::Context;
 use tarpc::context;
-use protocol::{User, UserId};
 
 use super::ServiceClient;
 use dialoguer::{Confirm, Input, Password, Select};
@@ -31,6 +31,7 @@ pub async fn main_menu(client: ServiceClient) {
             .item("Add user")
             .item("Modify user")
             .item("Remove user")
+            .item("Dump server")
             .item("Dump save")
             .item("Set save")
             .interact()
@@ -41,8 +42,9 @@ pub async fn main_menu(client: ServiceClient) {
             1 => ui.add_user().await,
             2 => ui.modify_user().await,
             3 => ui.remove_user().await,
-            4 => ui.dump_save().await,
-            5 => ui.set_save().await,
+            4 => ui.dump_server().await,
+            5 => ui.dump_save().await,
+            6 => ui.set_save().await,
             _ => unreachable!(),
         }
     }
@@ -183,14 +185,39 @@ impl Tui {
         Ok(list.remove(selection))
     }
 
-    async fn dump_save(&self) {
-        let path = dump_path();
-        if !path.exists() {
-            tokio::fs::create_dir(&path)
-                .await
-                .expect("could not directory for save dump");
+    async fn dump_server(&self) {
+        let selection = Select::new()
+            .with_prompt("platform?")
+            .item("cancel")
+            .item("linux")
+            .item("windows")
+            // .item("mac os")
+            .interact()
+            .unwrap();
+
+        let platform = match selection {
+            0 => return,
+            1 => Platform::Linux,
+            2 => Platform::Windows,
+            // 3 => Platform::MacOs,
+            _ => unreachable!(),
+        };
+
+        let dir = dump_path().await;
+        if !is_empty(&dir).await {
+            println!("dir should be empty: {dir:?}");
+            return
         }
-        let path = tokio::fs::canonicalize(path).await.unwrap();
+
+        self.client
+            .dump_server(context::current(), dir, platform)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    async fn dump_save(&self) {
+        let path = dump_path().await;
 
         self.client
             .dump_save(context::current(), path.clone())
@@ -201,35 +228,22 @@ impl Tui {
     }
 
     async fn set_save(&self) {
-        let path = dump_path();
-        if !path.exists() {
-            tokio::fs::create_dir(&path)
-                .await
-                .expect("could not load save as there is no where to load from, try dumping the save first");
-        }
-        let path = tokio::fs::canonicalize(dump_path()).await.unwrap();
-        let is_empty = tokio::fs::read_dir(&path)
-            .await
-            .expect("could not check save dump content")
-            .next_entry()
-            .await
-            .unwrap()
-            .is_none();
+        let dir = dump_path().await;
 
-        if is_empty {
+        if is_empty(&dir).await {
             println!("can not load empty save");
             return;
         }
 
         let mut context = Context::current();
-        context.deadline = SystemTime::now() + Duration::from_secs(60*20);
+        context.deadline = SystemTime::now() + Duration::from_secs(60 * 20);
         println!("started importing save, will be aborted after 20 minutes");
         self.client
-            .set_save(context, path.clone())
+            .set_save(context, dir.clone())
             .await
             .expect("rpc failure")
             .unwrap();
-        println!("set the current save to the content of: {:?}", path);
+        println!("set the current save to the content of: {:?}", &dir);
     }
 }
 
@@ -280,6 +294,24 @@ fn change_password(pass: &mut Option<String>) {
     }
 }
 
-fn dump_path() -> &'static Path {
-    Path::new("save_dump")
+async fn dump_path() -> PathBuf {
+    let path = Path::new("save_dump");
+
+    if !path.exists() {
+        tokio::fs::create_dir(&path)
+            .await
+            .expect("could not make directory for save dump");
+    }
+
+    tokio::fs::canonicalize(path).await.unwrap()
+}
+
+async fn is_empty(path: &Path) -> bool {
+    tokio::fs::read_dir(path)
+        .await
+        .expect("could not check save dump content")
+        .next_entry()
+        .await
+        .unwrap()
+        .is_none()
 }
