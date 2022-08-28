@@ -13,8 +13,6 @@ use tracing::{debug, instrument};
 
 mod config;
 pub mod parser;
-#[cfg(feature = "util")]
-pub mod util;
 pub use config::Config;
 pub use parser::{Line, Message};
 

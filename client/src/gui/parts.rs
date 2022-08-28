@@ -7,7 +7,8 @@ use std::ops::RangeInclusive;
 pub use crate::Event as Msg;
 use iced::widget::Column;
 use iced::{button, Button, Length, ProgressBar, Row, Space};
-use iced::{Align, Element, HorizontalAlignment, Text};
+use iced::{Element, Text};
+use iced_native::{alignment::Horizontal, Alignment}; 
 
 pub trait ClearError: Clone {
     type Error: Eq + Hash + Display;
@@ -34,11 +35,11 @@ impl<'a, Err: fmt::Debug + Clone + Eq + Hash + Display> ErrorBar<Err> {
         let mut column = Column::new();
         for (err, button_state) in self.0.iter_mut() {
             let button = Button::new(button_state, Text::new('x')).on_press(Ev::clear(err.clone()));
-            let text = Text::new(err.to_string()).horizontal_alignment(HorizontalAlignment::Left);
+            let text = Text::new(err.to_string()).horizontal_alignment(Horizontal::Left);
             column = column.push(
                 Row::new()
                     .width(Length::Fill)
-                    .align_items(Align::Center)
+                    .align_items(Alignment::Center)
                     .push(button)
                     .push(text),
             );

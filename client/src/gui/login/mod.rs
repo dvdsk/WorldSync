@@ -3,7 +3,8 @@ use crate::gui::style;
 pub use crate::Event as Msg;
 use iced::widget::Column;
 use iced::{button, text_input, Button, Checkbox, Command, Length, Row, Space, TextInput};
-use iced::{Align, Element, HorizontalAlignment, Text};
+use iced::{Element, Text};
+use iced_native::{alignment::Horizontal, Alignment}; 
 use shared::tarpc::client::RpcError;
 
 use super::parts::ClearError;
@@ -165,10 +166,10 @@ impl Page {
         let inputs = self.inputs.view().map(Msg::LoginPage);
         let title = Text::new("WorldSync")
             .width(Length::FillPortion(1))
-            .horizontal_alignment(HorizontalAlignment::Center);
+            .horizontal_alignment(Horizontal::Center);
 
         let column = Column::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .width(Length::FillPortion(8))
             .push(Space::with_height(Length::FillPortion(4)))
             .push(title)
@@ -192,14 +193,14 @@ impl Page {
     }
 }
 
-fn remember_me(is_checked: bool) -> Checkbox<Msg> {
+fn remember_me(is_checked: bool) -> Checkbox<'static, Msg> {
     Checkbox::new(is_checked, "Keep me logged in", |b| {
         Msg::LoginPage(Event::RememberToggle(b))
     })
 }
 
 fn right_text(text: &str) -> Text {
-    Text::new(text).horizontal_alignment(HorizontalAlignment::Right)
+    Text::new(text).horizontal_alignment(Horizontal::Right)
 }
 
 fn login_button(state: &mut button::State, logging_in: bool) -> Button<Msg> {

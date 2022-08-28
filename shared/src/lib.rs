@@ -98,3 +98,31 @@ pub async fn dir_empty(target: &Path) -> bool {
         .unwrap()
         .is_none()
 }
+
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash, Eq)]
+pub enum Platform {
+    Windows,
+    Linux,
+}
+
+impl Platform {
+    pub fn current() -> Result<Self, ()> {
+        if cfg!(target_os = "linux") {
+            Ok(Self::Linux)
+        } else if cfg!(target_os = "windows") {
+            Ok(Self::Windows)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl std::fmt::Display for Platform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Windows => write!(f, "windows"),
+            Self::Linux => write!(f, "linux"),
+        }
+    }
+}

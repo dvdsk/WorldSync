@@ -4,7 +4,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 mod util;
-use protocol::Platform;
+use shared::Platform;
 use shared::tarpc::context;
 use util::{free_port, spawn_test_server, test_conn};
 

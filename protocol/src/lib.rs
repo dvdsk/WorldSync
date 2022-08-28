@@ -7,6 +7,7 @@ use wrapper::parser::Line;
 
 use serde::{Deserialize, Serialize};
 use shared::tarpc;
+use shared::Platform;
 pub use time;
 pub use uuid::Uuid;
 
@@ -127,24 +128,6 @@ impl User {
     }
     pub fn test_password(num: u8) -> String {
         format!("testpass{}", num)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash, Eq)]
-pub enum Platform {
-    Windows,
-    Linux,
-}
-
-impl Platform {
-    pub fn current() -> Result<Self, ()> {
-        if cfg!(target_os = "linux") {
-            Ok(Self::Linux)
-        } else if cfg!(target_os = "windows") {
-            Ok(Self::Windows)
-        } else {
-            Err(())
-        }
     }
 }
 

@@ -4,8 +4,9 @@ use crate::gui::parts::ClearError;
 use crate::mc;
 pub use crate::Event as Msg;
 use iced::{
-    button, Align, Button, Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text,
+    button, Button, Column, Command, Element, Length, Row, Space, Text,
 };
+use iced_native::{Alignment, alignment::Horizontal};
 use protocol::HostId;
 use shared::tarpc::client::RpcError;
 
@@ -14,7 +15,6 @@ use super::tasks::SubStatus;
 use super::{RpcConn, SubsList};
 
 mod tasks;
-use crate::java_setup;
 use crate::world_download;
 
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq, Hash)]
@@ -101,9 +101,6 @@ impl Page {
     }
 
     pub fn add_subs(&self, subs: &mut SubsList) {
-        if let Some(id) = self.java_setup.active() {
-            subs.push(java_setup::sub(id))
-        }
         if let Some(id) = self.download.active() {
             let host_id = self.host_id;
             subs.push(world_download::sub(self.rpc.clone(), id))
@@ -116,7 +113,7 @@ impl Page {
         let top_spacer = Space::with_height(Length::FillPortion(1));
         let bottom_spacer = Space::with_height(Length::FillPortion(1));
         let center_column = Column::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .width(Length::FillPortion(8))
             .push(top_spacer)
             .push(title())
@@ -143,13 +140,13 @@ impl Page {
 fn title() -> Text {
     Text::new("You will be hosting")
         .width(Length::FillPortion(1))
-        .horizontal_alignment(HorizontalAlignment::Center)
+        .horizontal_alignment(Horizontal::Center)
 }
 
 fn host_button(state: &mut button::State) -> Button<Msg> {
     Button::new(
         state,
-        Text::new("Host").horizontal_alignment(HorizontalAlignment::Center),
+        Text::new("Host").horizontal_alignment(Horizontal::Center),
     )
     .on_press(Msg::HostPage(Event::WantToHost))
 }

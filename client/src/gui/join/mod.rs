@@ -1,7 +1,8 @@
 pub use crate::Event as Msg;
 use iced::{
-    button, Align, Button, Column, Element, HorizontalAlignment, Length, Row, Space, Text,
+    button, Button, Column, Element, Length, Row, Space, Text,
 };
+use iced_native::{alignment::Horizontal, Alignment}; 
 use protocol::HostDetails;
 
 use super::parts::Loading;
@@ -78,7 +79,7 @@ impl Page {
         let top_spacer = Space::with_height(Length::FillPortion(1));
         let bottom_spacer = Space::with_height(Length::FillPortion(1));
         let center_column = Column::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .width(Length::FillPortion(8))
             .push(top_spacer)
             .push(self.title())
@@ -107,14 +108,14 @@ impl Page {
 
         Text::new(label)
             .width(Length::FillPortion(1))
-            .horizontal_alignment(HorizontalAlignment::Center)
+            .horizontal_alignment(Horizontal::Center)
     }
 }
 
 fn copy_button(state: &mut button::State) -> Button<Msg> {
     Button::new(
         state,
-        Text::new("Copy Ip").horizontal_alignment(HorizontalAlignment::Center),
+        Text::new("Copy Ip").horizontal_alignment(Horizontal::Center),
     )
     .on_press(Msg::ClipHost)
 }

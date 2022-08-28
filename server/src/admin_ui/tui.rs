@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use protocol::{Platform, User, UserId};
+use shared::Platform;
+use protocol::{User, UserId};
 use shared::tarpc;
 use shared::tarpc::context::Context;
 use tarpc::context;

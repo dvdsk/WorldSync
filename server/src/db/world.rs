@@ -2,7 +2,7 @@ use core::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use protocol::Platform;
+use shared::Platform;
 use sync::{DirContent, DirUpdate, ObjectId, ObjectStore, SnapShot, StoreKey, UpdateList};
 use tokio::fs;
 use tracing::instrument;

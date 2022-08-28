@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::gui::host::Event as hEvent;
 use futures::stream::{self, BoxStream};
-use protocol::Platform;
+use shared::Platform;
 use shared::tarpc::client::RpcError;
 use shared::tarpc::context;
 use sync::{DirContent, DirUpdate, ObjectId, SyncAction};
@@ -49,6 +49,8 @@ pub enum Error {
     Fs,
     #[error("{0}")]
     Protocol(#[from] protocol::Error),
+    #[error("This platform is not supported")]
+    UnsupportedPlatform
 }
 
 impl From<sync::Error> for Error {
@@ -102,7 +104,7 @@ impl State {
             fs::create_dir(server_path()).await.unwrap();
         }
         let dir_content = DirContent::from_dir(server_path().into()).await?;
-        let platform = Platform::curren();
+        let platform = Platform::current().map_err(|_| Error::UnsupportedPlatform)?;
         debug!("{:?}", dir_content);
         let dir_update = self
             .conn

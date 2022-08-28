@@ -1,4 +1,5 @@
 use super::{db, events_channel, host, Sessions, World};
+use shared::Platform;
 use std::path::Path;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -14,16 +15,27 @@ pub async fn spawn_full_test_server(port: u16) {
     spawn(port, true).await;
 }
 
+async fn setup_import_dir() -> &'static Path {
+    use std::io::ErrorKind::AlreadyExists;
+    let new_dir = |dir: &Path| match std::fs::create_dir_all(dir) {
+        Ok(_) => (),
+        Err(e) if e.kind() == AlreadyExists => (),
+        Err(e) => panic!("{:?}", e),
+    };
+
+    let path = Path::new("save_dump");
+    new_dir(&path.join("data"));
+    for platform in &[Platform::Linux, Platform::Windows] {
+        new_dir(&path.join("platform").join(platform.to_string()));
+    }
+    path
+}
+
 /// util function meant for testing only, panics if anything goes wrong
 async fn setup_host_files(world: &mut World) {
     info!("setting up host files");
-    let path = Path::new("save_dump");
-    match std::fs::create_dir(&path).map_err(|e| e.kind()) {
-        Ok(_) => (),
-        Err(std::io::ErrorKind::AlreadyExists) => (),
-        Err(e) => panic!("{:?}", e),
-    };
-    wrapper::util::setup_server(&path, 25565).await;
+    let path = setup_import_dir().await;
+    todo!("get platform specific stuff from worldsync server");
     info!("importing host files to object store");
     world.set_save(path.to_owned()).await.unwrap();
 }

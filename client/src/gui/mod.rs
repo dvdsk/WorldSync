@@ -1,6 +1,6 @@
 use crate::{events, mc, Event};
 use derivative::Derivative;
-use iced::{executor, Application, Clipboard, Command, Element, Subscription};
+use iced::{clipboard, executor, Application, Command, Element, Subscription};
 use protocol::{HostState, ServiceClient, Uuid};
 use tracing::{debug, info};
 
@@ -86,7 +86,6 @@ impl Application for State {
     fn update(
         &mut self,
         message: Self::Message,
-        clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
         use Event::*;
 
@@ -118,7 +117,7 @@ impl Application for State {
                     }
                 }
             }
-            ClipHost => clipboard.write(self.can_join.as_ref().unwrap().host.addr.to_string()),
+            ClipHost => return clipboard::write(self.can_join.as_ref().unwrap().host.addr.to_string()),
             WorldUpdated => {
                 self.mc_server.start();
                 return self.can_host().update(host::Event::WorldUpdated);

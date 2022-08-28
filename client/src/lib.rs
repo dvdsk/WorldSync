@@ -4,7 +4,6 @@ pub mod gui;
 pub mod mc;
 mod world_download;
 mod world_upload;
-mod java_setup;
 use std::path::Path;
 
 pub use error::Error;

@@ -1,4 +1,5 @@
-use protocol::{HostId, HostState, Platform};
+use protocol::{HostId, HostState};
+use shared::Platform;
 use serde::{Deserialize, Serialize};
 use shared::dir_empty;
 use std::collections::HashMap;

@@ -6,7 +6,8 @@ use sync::{DirContent, DirUpdate, ObjectId,UpdateList};
 use wrapper::parser::Line;
 
 use super::ConnState;
-use protocol::{Error, Event, AWAIT_EVENT_TIMEOUT, Platform};
+use shared::Platform;
+use protocol::{Error, Event, AWAIT_EVENT_TIMEOUT};
 use protocol::{HostDetails, HostId, HostState, Service, SessionId, User, UserId};
 use shared::tarpc;
 use tarpc::context;

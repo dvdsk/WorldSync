@@ -3,7 +3,8 @@ use super::tasks::SubStatus;
 use super::{RpcConn, SubsList};
 pub use crate::Event as Msg;
 use crate::{mc, world_upload};
-use iced::{Column, Command, Element, HorizontalAlignment, Length, Row, Space, Text};
+use iced::{Column, Command, Element, Length, Row, Space, Text};
+use iced_native::alignment::Horizontal;
 use protocol::HostId;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -159,7 +160,7 @@ impl Page {
 fn title() -> Text {
     Text::new("Hosting")
         .width(Length::FillPortion(1))
-        .horizontal_alignment(HorizontalAlignment::Center)
+        .horizontal_alignment(Horizontal::Center)
 }
 
 fn elapsed(at: Instant) -> String {
@@ -179,5 +180,5 @@ fn last_save(at: Option<Instant>) -> Text {
     };
     Text::new(text)
         .width(Length::FillPortion(1))
-        .horizontal_alignment(HorizontalAlignment::Center)
+        .horizontal_alignment(Horizontal::Center)
 }
